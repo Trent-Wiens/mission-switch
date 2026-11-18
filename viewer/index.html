@@ -1,0 +1,1253 @@
+<title>Pursuit/Evader &mdash; switch replay</title>
+
+<style>
+  :root {
+    color-scheme: light dark;
+
+    /* Neutrals, biased slate &mdash; instrument housing, not pure grey. */
+    --bg:        #F6F7F8;
+    --surface:   #FFFFFF;
+    --surface-2: #EDEFF2;
+    --line:      #DCE0E6;
+    --line-soft: #E8EBEF;
+    --ink:       #171B21;
+    --ink-2:     #4A5460;
+    --ink-3:     #7C8694;
+
+    /* Data colours. Validated categorical set &mdash; the only chroma on the page. */
+    --m-cold:     #2E6FD9;
+    --m-warm:     #C77A1E;
+    --m-blend:    #1F8A70;
+    --m-filtered: #B5379A;
+
+    /* Reserved status. Never used for a series. */
+    --critical:  #D0342C;
+    --critical-soft: rgba(208, 52, 44, 0.10);
+
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+            "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+            sans-serif;
+
+    --r: 3px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:        #0D1117;
+      --surface:   #141A21;
+      --surface-2: #1B222B;
+      --line:      #262E39;
+      --line-soft: #1E2630;
+      --ink:       #E8ECF1;
+      --ink-2:     #9BA6B4;
+      --ink-3:     #6B7684;
+      --critical:  #F1685E;
+      --critical-soft: rgba(241, 104, 94, 0.12);
+    }
+  }
+
+  /* The viewer's own toggle must win over the media query, both directions. */
+  :root[data-theme="dark"] {
+    --bg:        #0D1117;
+    --surface:   #141A21;
+    --surface-2: #1B222B;
+    --line:      #262E39;
+    --line-soft: #1E2630;
+    --ink:       #E8ECF1;
+    --ink-2:     #9BA6B4;
+    --ink-3:     #6B7684;
+    --critical:  #F1685E;
+    --critical-soft: rgba(241, 104, 94, 0.12);
+  }
+  :root[data-theme="light"] {
+    --bg:        #F6F7F8;
+    --surface:   #FFFFFF;
+    --surface-2: #EDEFF2;
+    --line:      #DCE0E6;
+    --line-soft: #E8EBEF;
+    --ink:       #171B21;
+    --ink-2:     #4A5460;
+    --ink-3:     #7C8694;
+    --critical:  #D0342C;
+    --critical-soft: rgba(208, 52, 44, 0.10);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 28px 24px 56px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ---------- header ---------- */
+
+  header { display: flex; flex-direction: column; gap: 10px; }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  .sub { color: var(--ink-2); max-width: 62ch; }
+
+  .spec {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 18px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 7px 0;
+  }
+  .spec b { color: var(--ink-2); font-weight: 500; }
+
+  /* ---------- controls ---------- */
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px 28px;
+    align-items: flex-end;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+
+  .lbl {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .seg {
+    display: flex;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .seg button {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-2);
+    background: transparent;
+    border: 0;
+    border-right: 1px solid var(--line);
+    padding: 6px 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button:hover { background: var(--surface-2); color: var(--ink); }
+
+  /* Active state inverts to ink &mdash; no hue, so chroma stays reserved for data. */
+  .seg button[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .seg button[aria-pressed="true"]:hover { background: var(--ink); }
+
+  .seg button .swatch {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: 1px;
+  }
+
+  button:focus-visible, input:focus-visible, a:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+
+  /* ---------- main grid ---------- */
+
+  .main {
+    display: grid;
+    grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  @media (max-width: 920px) {
+    .main { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+
+  .panel-hd {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .panel-hd .rt {
+    letter-spacing: 0;
+    text-transform: none;
+    font-size: 11px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  #map { display: block; width: 100%; height: auto; }
+
+  /* ---------- transport ---------- */
+
+  .transport {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .tbtn {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--surface-2);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 5px 10px;
+    cursor: pointer;
+    min-width: 62px;
+  }
+  .tbtn:hover { background: var(--line-soft); }
+
+  #scrub {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--ink);
+    cursor: pointer;
+  }
+
+  .clock {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+
+  /* ---------- charts ---------- */
+
+  .charts { display: flex; flex-direction: column; gap: 12px; }
+
+  .chart-svg { display: block; width: 100%; height: auto; touch-action: none; }
+
+  .grid-line { stroke: var(--line-soft); stroke-width: 1; }
+  .axis-line { stroke: var(--line); stroke-width: 1; }
+  .tick {
+    font-family: var(--mono);
+    font-size: 9px;
+    fill: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .axis-name {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    fill: var(--ink-3);
+    text-transform: uppercase;
+  }
+  .series { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .series-dash { stroke-dasharray: 3 3; stroke-width: 1.5; }
+  .zero-line { stroke: var(--critical); stroke-width: 1; stroke-dasharray: 2 3; }
+  .commit-line { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 4 3; }
+  .commit-tag {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    fill: var(--ink-3);
+  }
+  .cursor-line { stroke: var(--ink-2); stroke-width: 1; }
+  .dot-now { stroke: var(--surface); stroke-width: 2; }
+  .direct-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    padding: 0 12px 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-2);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i {
+    width: 14px; height: 2px; border-radius: 1px;
+    display: inline-block;
+  }
+  .legend i.dash {
+    height: 0; border-top: 2px dashed currentColor; border-radius: 0;
+  }
+
+  /* ---------- tiles ---------- */
+
+  .left-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 10px;
+  }
+
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 11px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .tile.alert { border-color: var(--critical); background: var(--critical-soft); }
+
+  .tile .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .tile .v {
+    font-family: var(--mono);
+    font-size: 21px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+  }
+  .tile .v.bad { color: var(--critical); }
+  .tile .u { font-size: 12px; color: var(--ink-3); }
+  .tile .note { font-size: 11px; color: var(--ink-3); font-family: var(--mono); }
+
+  /* ---------- table ---------- */
+
+  details { border-top: 1px solid var(--line); padding-top: 14px; }
+  summary {
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+  }
+  .tbl-scroll { overflow-x: auto; margin-top: 12px; }
+  table { border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  th, td {
+    padding: 5px 12px 5px 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  th:first-child, td:first-child { text-align: left; }
+  thead th {
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    border-bottom: 1px solid var(--line);
+  }
+  tbody tr { border-bottom: 1px solid var(--line-soft); }
+  td .mk {
+    display: inline-block;
+    width: 7px; height: 7px; border-radius: 50%;
+    margin-right: 7px;
+  }
+
+  footer {
+    color: var(--ink-3);
+    font-size: 12px;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+  footer code {
+    font-family: var(--mono);
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 2px;
+    color: var(--ink-2);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <h1>Starting the escape controller without a jolt</h1>
+    <p class="sub">
+      Replay of the handover instant. The drone surveys until a pursuer is
+      detected at <i>t</i>&nbsp;=&nbsp;0, waits out the hold, then commits to an
+      escape controller. Scrub to see what the controller commanded against what
+      the drone actually did.
+    </p>
+    <div class="spec" id="spec"></div>
+  </header>
+
+  <div class="controls">
+    <div class="field">
+      <span class="lbl" id="lbl-appr">Approach</span>
+      <div class="seg" id="seg-bearing" role="group" aria-labelledby="lbl-appr"></div>
+    </div>
+    <div class="field">
+      <span class="lbl" id="lbl-rng">Detection range</span>
+      <div class="seg" id="seg-range" role="group" aria-labelledby="lbl-rng"></div>
+    </div>
+    <div class="field">
+      <span class="lbl" id="lbl-mth">Start-up method</span>
+      <div class="seg" id="seg-method" role="group" aria-labelledby="lbl-mth"></div>
+    </div>
+    <div class="field">
+      <span class="lbl" id="lbl-thm">Theme</span>
+      <div class="seg" role="group" aria-labelledby="lbl-thm">
+        <button type="button" id="theme-toggle">Dark</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <div class="left-col">
+    <section class="panel">
+      <div class="panel-hd">
+        <span>Plan view</span>
+        <span class="rt" id="map-rt"></span>
+      </div>
+      <canvas id="map" width="960" height="960" role="img"
+              aria-label="Top-down view of the drone and pursuer trajectories"></canvas>
+      <div class="transport">
+        <button class="tbtn" id="play" type="button">Play</button>
+        <input type="range" id="scrub" min="0" max="240" value="0" step="1"
+               aria-label="Scrub through time" />
+        <span class="clock" id="clock"></span>
+      </div>
+      </section>
+
+      <div class="tiles" id="tiles"></div>
+    </div>
+
+    <section class="charts">
+      <div class="panel">
+        <div class="panel-hd">
+          <span>Speed &mdash; commanded vs actual</span>
+          <span class="rt" id="speed-rt"></span>
+        </div>
+        <svg class="chart-svg" id="chart-speed" viewBox="0 0 720 230"
+             preserveAspectRatio="xMidYMid meet" role="img"
+             aria-label="Commanded and actual speed against time"></svg>
+        <div class="legend" id="legend-speed"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-hd">
+          <span>Safety margin</span>
+          <span class="rt" id="margin-rt"></span>
+        </div>
+        <svg class="chart-svg" id="chart-margin" viewBox="0 0 720 180"
+             preserveAspectRatio="xMidYMid meet" role="img"
+             aria-label="Certificate safety margin against time"></svg>
+        <div class="legend" id="legend-margin"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-hd">
+          <span>Range to pursuer</span>
+          <span class="rt" id="range-rt"></span>
+        </div>
+        <svg class="chart-svg" id="chart-range" viewBox="0 0 720 180"
+             preserveAspectRatio="xMidYMid meet" role="img"
+             aria-label="Distance between drone and pursuer against time"></svg>
+        <div class="legend" id="legend-range"></div>
+      </div>
+    </section>
+  </div>
+
+  <details>
+    <summary>Metrics for every method in this case</summary>
+    <div class="tbl-scroll">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Cmd &Delta;v (m/s)</th>
+            <th>Cmd &Delta;a (m/s&sup2;)</th>
+            <th>Peak slew (m/s&sup2;)</th>
+            <th>Min margin (m)</th>
+            <th>Closest (m)</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </details>
+
+  <footer>
+    Generated from the simulator in <code>Code/</code>. Regenerate with
+    <code>python3 export_viz.py</code>. Every run here uses the deferring wait
+    policy, so the switch happens straight out of surveillance, which is where
+    the jolt is largest. A simulation sweep is evidence, not a proof.
+  </footer>
+</div>
+
+<script src="runs.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var D = window.RUNS;
+  if (!D) { document.body.innerHTML = "<p>runs.js failed to load.</p>"; return; }
+
+  var CFG = D.config;
+  var COLORS = {
+    cold: "#2E6FD9", warm: "#C77A1E", blend: "#1F8A70", filtered: "#B5379A"
+  };
+  function css(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  var state = {
+    bearing: D.bearings[0].key,
+    range: D.ranges[1],
+    method: "cold",
+    compare: false,
+    frame: 0,
+    playing: false
+  };
+
+  function runKey(method) {
+    return state.bearing + "|" + fmtRange(state.range) + "|" + method;
+  }
+  function fmtRange(r) { return String(r).replace(/\.0$/, ""); }
+  function current() { return D.runs[runKey(state.method)]; }
+
+  function shownMethods() {
+    return state.compare ? D.methods.map(function (m) { return m.key; })
+                         : [state.method];
+  }
+
+  // Captured runs stop at the capture instant, so lengths differ. The
+  // transport spans the longest run on screen; shorter ones simply end.
+  function nFrames() {
+    return shownMethods().reduce(function (n, mk) {
+      return Math.max(n, D.runs[runKey(mk)].t.length);
+    }, 1);
+  }
+
+  // The time axis has to come from the longest run too, not from `current()`.
+  function timeAxis() {
+    var best = current();
+    shownMethods().forEach(function (mk) {
+      var r = D.runs[runKey(mk)];
+      if (r.t.length > best.t.length) best = r;
+    });
+    return best.t;
+  }
+
+  /* ---------------- controls ---------------- */
+
+  function buildSeg(el, items, isOn, onPick) {
+    el.textContent = "";
+    items.forEach(function (it) {
+      var b = document.createElement("button");
+      b.type = "button";
+      if (it.color) {
+        var sw = document.createElement("span");
+        sw.className = "swatch";
+        sw.style.background = it.color;
+        b.appendChild(sw);
+      }
+      b.appendChild(document.createTextNode(it.label));
+      b.setAttribute("aria-pressed", isOn(it) ? "true" : "false");
+      b.addEventListener("click", function () { onPick(it); });
+      el.appendChild(b);
+    });
+  }
+
+  function renderControls() {
+    buildSeg(
+      document.getElementById("seg-bearing"),
+      D.bearings,
+      function (it) { return it.key === state.bearing; },
+      function (it) { state.bearing = it.key; refresh(true); }
+    );
+    buildSeg(
+      document.getElementById("seg-range"),
+      D.ranges.map(function (r) { return { key: r, label: fmtRange(r) + " m" }; }),
+      function (it) { return it.key === state.range; },
+      function (it) { state.range = it.key; refresh(true); }
+    );
+    var methodItems = D.methods.map(function (m) {
+      return { key: m.key, label: m.label, color: COLORS[m.key] };
+    });
+    methodItems.push({ key: "__all", label: "Compare all" });
+    buildSeg(
+      document.getElementById("seg-method"),
+      methodItems,
+      function (it) {
+        return it.key === "__all" ? state.compare
+                                  : (!state.compare && it.key === state.method);
+      },
+      function (it) {
+        if (it.key === "__all") { state.compare = true; }
+        else { state.compare = false; state.method = it.key; }
+        refresh(false);
+      }
+    );
+  }
+
+  document.getElementById("spec").innerHTML = [
+    ["hold h", CFG.h + " s"],
+    ["tau", CFG.tau + " s"],
+    ["flee speed", CFG.vFlee + " m/s"],
+    ["pursuer", CFG.vPursuer + " m/s"],
+    ["capture", CFG.captureRadius + " m"],
+    ["accel cap", CFG.aMax + " m/s\u00b2"]
+  ].map(function (p) {
+    return "<span>" + p[0] + " <b>" + p[1] + "</b></span>";
+  }).join("");
+
+  /* ---------------- theme ---------------- */
+
+  var themeBtn = document.getElementById("theme-toggle");
+  function isDark() {
+    var set = document.documentElement.getAttribute("data-theme");
+    if (set) return set === "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function syncThemeLabel() { themeBtn.textContent = isDark() ? "Light" : "Dark"; }
+  themeBtn.addEventListener("click", function () {
+    document.documentElement.setAttribute("data-theme", isDark() ? "light" : "dark");
+    syncThemeLabel();
+    draw();
+  });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+    syncThemeLabel(); draw();
+  });
+
+  /* ---------------- plan view ---------------- */
+
+  var cv = document.getElementById("map");
+  var ctx = cv.getContext("2d");
+
+  // Metres across the canvas. Fitted to the whole selection once, not per
+  // frame, so the scale holds still while the replay runs.
+  var VIEW = 120;
+
+  function fitView() {
+    var methods = state.compare ? D.methods.map(function (m) { return m.key; })
+                                : [state.method];
+    var reach = CFG.surveilRadius * 1.2;
+    methods.forEach(function (mk) {
+      var r = D.runs[runKey(mk)];
+      for (var i = 0; i < r.ex.length; i++) {
+        reach = Math.max(reach, Math.hypot(r.ex[i], r.ey[i]),
+                                Math.hypot(r.px[i], r.py[i]));
+      }
+    });
+    VIEW = Math.max(90, reach * 2.2);
+  }
+
+  function toPx(x, y) {
+    var s = cv.width / VIEW;
+    return [cv.width / 2 + x * s, cv.height / 2 - y * s];
+  }
+  function mToPx(m) { return m * (cv.width / VIEW); }
+
+  function circle(x, y, rMetres, stroke, width, dash) {
+    var p = toPx(x, y);
+    ctx.beginPath();
+    ctx.setLineDash(dash || []);
+    ctx.lineWidth = width;
+    ctx.strokeStyle = stroke;
+    ctx.arc(p[0], p[1], mToPx(rMetres), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function polyline(xs, ys, upto, stroke, width, dash) {
+    if (upto < 1) return;
+    ctx.beginPath();
+    ctx.setLineDash(dash || []);
+    ctx.lineWidth = width;
+    ctx.strokeStyle = stroke;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    for (var i = 0; i <= upto; i++) {
+      var p = toPx(xs[i], ys[i]);
+      if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function dot(x, y, rPx, fill, ring) {
+    var p = toPx(x, y);
+    ctx.beginPath();
+    ctx.fillStyle = fill;
+    ctx.arc(p[0], p[1], rPx, 0, Math.PI * 2);
+    ctx.fill();
+    if (ring) { ctx.lineWidth = 3; ctx.strokeStyle = ring; ctx.stroke(); }
+  }
+
+  function chevron(x, y, dx, dy, sizePx, fill) {
+    var p = toPx(x, y);
+    var a = Math.atan2(-dy, dx);
+    ctx.save();
+    ctx.translate(p[0], p[1]);
+    ctx.rotate(a);
+    ctx.beginPath();
+    ctx.moveTo(sizePx, 0);
+    ctx.lineTo(-sizePx * 0.75, sizePx * 0.72);
+    ctx.lineTo(-sizePx * 0.35, 0);
+    ctx.lineTo(-sizePx * 0.75, -sizePx * 0.72);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function label(x, y, text, fill, dxPx, dyPx) {
+    var p = toPx(x, y);
+    ctx.font = "600 17px ui-monospace, SFMono-Regular, Menlo, monospace";
+    ctx.fillStyle = fill;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, p[0] + dxPx, p[1] + dyPx);
+  }
+
+  function drawMap() {
+    var inkC = css("--ink"), ink2 = css("--ink-2"), ink3 = css("--ink-3");
+    var lineC = css("--line"), surf = css("--surface"), crit = css("--critical");
+
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = surf;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    // Geofence and surveillance circle &mdash; the fixed furniture of the scene.
+    // The fence may fall outside the fitted view; its arc simply clips.
+    circle(0, 0, CFG.geofenceRadius, lineC, 2, [10, 8]);
+    circle(0, 0, CFG.surveilRadius, lineC, 1.5, [3, 6]);
+    ctx.font = "500 15px ui-monospace, SFMono-Regular, Menlo, monospace";
+    ctx.fillStyle = ink3;
+    ctx.textAlign = "left";
+    if (CFG.geofenceRadius < VIEW / 2) {
+      ctx.fillText("GEOFENCE " + CFG.geofenceRadius + " m", toPx(0, 0)[0] + 8,
+                   toPx(0, -CFG.geofenceRadius)[1] - 10);
+    }
+    ctx.fillText("SURVEY " + CFG.surveilRadius + " m", toPx(0, 0)[0] + 8,
+                 toPx(0, -CFG.surveilRadius)[1] - 10);
+
+    var methods = shownMethods();
+    var f = Math.min(state.frame, nFrames() - 1);
+    var commitIdx = Math.round(CFG.h * CFG.viewHz);
+
+    // The pursuer chases whichever evader it is given, so its track differs by
+    // method. Draw one per method, always in neutral ink so it never competes
+    // with a series colour; form and label carry its identity, not hue.
+    // Ghost of the whole run underneath, so the scene reads at t = 0 and the
+    // travelled portion is legible as progress along a known path.
+    ctx.globalAlpha = 0.34;
+    methods.forEach(function (mk) {
+      var r = D.runs[runKey(mk)];
+      polyline(r.ex, r.ey, r.t.length - 1, COLORS[mk], 2.5);
+      polyline(r.px, r.py, r.t.length - 1, ink3, 2);
+    });
+    ctx.globalAlpha = 1;
+
+    methods.forEach(function (mk) {
+      var r = D.runs[runKey(mk)];
+      polyline(r.px, r.py, Math.min(f, r.t.length - 1), ink3, 2, [6, 5]);
+    });
+
+    methods.forEach(function (mk) {
+      var r = D.runs[runKey(mk)];
+      var ff = Math.min(f, r.t.length - 1);
+      polyline(r.ex, r.ey, ff, COLORS[mk], 3);
+      if (ff >= commitIdx) {
+        dot(r.ex[commitIdx], r.ey[commitIdx], 4, surf, COLORS[mk]);
+      }
+      dot(r.ex[ff], r.ey[ff], 7, COLORS[mk], surf);
+    });
+
+    // Pursuers last, on top, each with its capture ring.
+    methods.forEach(function (mk) {
+      var r = D.runs[runKey(mk)];
+      var pf = Math.min(f, r.t.length - 1);
+      circle(r.px[pf], r.py[pf], CFG.captureRadius, crit, 2, [4, 4]);
+      if (state.compare) {
+        dot(r.px[pf], r.py[pf], 5, inkC);
+      } else {
+        var pdx = pf > 0 ? r.px[pf] - r.px[pf - 1] : 1;
+        var pdy = pf > 0 ? r.py[pf] - r.py[pf - 1] : 0;
+        chevron(r.px[pf], r.py[pf], pdx, pdy, 11, inkC);
+      }
+    });
+
+    var lead = D.runs[runKey(methods[0])];
+    var lf = Math.min(f, lead.t.length - 1);
+    label(lead.px[lf], lead.py[lf], state.compare ? "PURSUERS" : "PURSUER",
+          ink2, 16, -16);
+    if (!state.compare) {
+      var r0 = D.runs[runKey(state.method)];
+      var rf = Math.min(f, r0.t.length - 1);
+      label(r0.ex[rf], r0.ey[rf], "EVADER", COLORS[state.method], 14, -16);
+    }
+
+    var cur = current();
+    var cf = Math.min(f, cur.t.length - 1);
+    document.getElementById("map-rt").textContent =
+      "gap " + cur.dist[cf].toFixed(1) + " m";
+  }
+
+  /* ---------------- charts ---------------- */
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  function el(name, attrs) {
+    var n = document.createElementNS(SVG_NS, name);
+    for (var k in attrs) { if (attrs[k] != null) n.setAttribute(k, attrs[k]); }
+    return n;
+  }
+
+  function niceTicks(lo, hi, want) {
+    var span = hi - lo;
+    if (span <= 0) return [lo];
+    var raw = span / want;
+    var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    var norm = raw / mag;
+    var step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+    var out = [];
+    for (var v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) {
+      out.push(Math.round(v / step) * step);
+    }
+    return out;
+  }
+
+  function drawChart(svgId, legendId, spec) {
+    var svg = document.getElementById(svgId);
+    svg.textContent = "";
+    var vb = svg.getAttribute("viewBox").split(" ").map(Number);
+    var W = vb[2], H = vb[3];
+    var M = { l: 44, r: 76, t: 12, b: 24 };
+    var pw = W - M.l - M.r, ph = H - M.t - M.b;
+
+    var ink3 = css("--ink-3"), ink2 = css("--ink-2"), surf = css("--surface");
+
+    var tMax = CFG.viewHz > 0 ? spec.t[spec.t.length - 1] : 1;
+    var lo = spec.lo, hi = spec.hi;
+    if (hi - lo < 1e-6) { hi = lo + 1; }
+
+    function X(t) { return M.l + (t / tMax) * pw; }
+    function Y(v) { return M.t + ph - ((v - lo) / (hi - lo)) * ph; }
+
+    // Grid and value axis.
+    niceTicks(lo, hi, 4).forEach(function (v) {
+      svg.appendChild(el("line", {
+        class: "grid-line", x1: M.l, x2: M.l + pw, y1: Y(v), y2: Y(v)
+      }));
+      var tx = el("text", { class: "tick", x: M.l - 7, y: Y(v) + 3, "text-anchor": "end" });
+      tx.textContent = v;
+      svg.appendChild(tx);
+    });
+
+    // Time axis.
+    niceTicks(0, tMax, 6).forEach(function (t) {
+      var tx = el("text", { class: "tick", x: X(t), y: H - 7, "text-anchor": "middle" });
+      tx.textContent = t;
+      svg.appendChild(tx);
+    });
+    svg.appendChild(el("line", {
+      class: "axis-line", x1: M.l, x2: M.l + pw, y1: M.t + ph, y2: M.t + ph
+    }));
+
+    var an = el("text", { class: "axis-name", x: M.l - 7, y: M.t - 2, "text-anchor": "end" });
+    an.textContent = spec.unit;
+    svg.appendChild(an);
+
+    // Zero reference, where crossing it means something.
+    if (spec.zero != null && lo < spec.zero && hi > spec.zero) {
+      svg.appendChild(el("line", {
+        class: "zero-line", x1: M.l, x2: M.l + pw, y1: Y(spec.zero), y2: Y(spec.zero)
+      }));
+    }
+
+    // Commit instant.
+    svg.appendChild(el("line", {
+      class: "commit-line", x1: X(CFG.h), x2: X(CFG.h), y1: M.t, y2: M.t + ph
+    }));
+    var ct = el("text", { class: "commit-tag", x: X(CFG.h) + 4, y: M.t + 9 });
+    ct.textContent = "COMMIT";
+    svg.appendChild(ct);
+
+    // Series.
+    var labels = [];
+    spec.series.forEach(function (s) {
+      var d = "";
+      for (var i = 0; i < s.v.length; i++) {
+        d += (i ? "L" : "M") + X(spec.t[i]).toFixed(2) + "," + Y(s.v[i]).toFixed(2);
+      }
+      svg.appendChild(el("path", {
+        class: "series" + (s.dash ? " series-dash" : ""), d: d, stroke: s.color
+      }));
+      if (s.label) {
+        // Anchor the label where the line actually ends &mdash; a captured run stops
+        // early, and a label parked at the right edge would misreport that.
+        var li = s.v.length - 1;
+        labels.push({
+          text: s.label, color: s.color,
+          x: Math.min(M.l + pw + 6, X(spec.t[li]) + 6),
+          y: Y(s.v[li]) + 3
+        });
+      }
+    });
+
+    // Push overlapping labels apart. Converging trajectories would otherwise
+    // stack every label at the same height, into an unreadable pile.
+    var GAP = 11;
+    labels.sort(function (a, b) { return a.y - b.y; });
+    for (var li2 = 1; li2 < labels.length; li2++) {
+      if (labels[li2].y - labels[li2 - 1].y < GAP) {
+        labels[li2].y = labels[li2 - 1].y + GAP;
+      }
+    }
+    if (labels.length) {
+      var over = labels[labels.length - 1].y - (M.t + ph);
+      if (over > 0) { labels.forEach(function (l) { l.y -= over; }); }
+    }
+    labels.forEach(function (l) {
+      var lt = el("text", {
+        class: "direct-label",
+        x: l.x,
+        y: Math.max(M.t + 8, l.y),
+        fill: l.color
+      });
+      lt.textContent = l.text;
+      svg.appendChild(lt);
+    });
+
+    // Cursor + current-value dots.
+    var f = Math.min(state.frame, spec.t.length - 1);
+    svg.appendChild(el("line", {
+      class: "cursor-line", x1: X(spec.t[f]), x2: X(spec.t[f]),
+      y1: M.t, y2: M.t + ph
+    }));
+    spec.series.forEach(function (s) {
+      var i = Math.min(f, s.v.length - 1);
+      svg.appendChild(el("circle", {
+        class: "dot-now", cx: X(spec.t[i]), cy: Y(s.v[i]), r: 4, fill: s.color
+      }));
+    });
+
+    // Hover: move the global cursor, so all three charts and the map agree.
+    // Ignored while playing, so an idle mouse over a chart cannot fight the
+    // transport.
+    svg.style.cursor = "ew-resize";
+    svg.onpointermove = function (ev) {
+      if (state.playing) return;
+      var box = svg.getBoundingClientRect();
+      var px = (ev.clientX - box.left) / box.width * W;
+      var frac = (px - M.l) / pw;
+      var idx = Math.round(frac * (spec.t.length - 1));
+      if (idx >= 0 && idx < spec.t.length) { setFrame(idx, false); }
+    };
+
+    // Legend &mdash; identity is never colour alone.
+    var lg = document.getElementById(legendId);
+    lg.textContent = "";
+    spec.series.forEach(function (s) {
+      var sp = document.createElement("span");
+      var sw = document.createElement("i");
+      if (s.dash) { sw.className = "dash"; sw.style.color = s.color; }
+      else { sw.style.background = s.color; }
+      sp.appendChild(sw);
+      sp.appendChild(document.createTextNode(s.legend || s.label));
+      lg.appendChild(sp);
+    });
+  }
+
+  function extent(arrays, pad) {
+    var lo = Infinity, hi = -Infinity;
+    arrays.forEach(function (a) {
+      for (var i = 0; i < a.length; i++) {
+        if (a[i] < lo) lo = a[i];
+        if (a[i] > hi) hi = a[i];
+      }
+    });
+    var span = (hi - lo) || 1;
+    return [lo - span * pad, hi + span * pad];
+  }
+
+  function drawCharts() {
+    var cur = current();
+    var tAxis = timeAxis();
+    var methods = shownMethods();
+
+    // Speed.
+    var sSeries = [], sData = [];
+    if (state.compare) {
+      methods.forEach(function (mk) {
+        var r = D.runs[runKey(mk)];
+        sSeries.push({ v: r.spd, color: COLORS[mk], label: shortLabelOf(mk),
+                       legend: labelOf(mk) + " actual" });
+        sData.push(r.spd);
+      });
+    } else {
+      sSeries.push({ v: cur.cmd, color: COLORS[state.method], dash: true,
+                     legend: "Commanded" });
+      sSeries.push({ v: cur.spd, color: COLORS[state.method],
+                     legend: "Actual" });
+      sData.push(cur.cmd, cur.spd);
+    }
+    var sx = extent(sData, 0.08);
+    drawChart("chart-speed", "legend-speed", {
+      t: tAxis, lo: Math.min(0, sx[0]), hi: sx[1], unit: "m/s",
+      series: sSeries
+    });
+
+    // Margin.
+    var mSeries = [], mData = [];
+    methods.forEach(function (mk) {
+      var r = D.runs[runKey(mk)];
+      mSeries.push({ v: r.mar, color: COLORS[mk],
+                     label: state.compare ? shortLabelOf(mk) : null,
+                     legend: state.compare ? labelOf(mk) : "Margin" });
+      mData.push(r.mar);
+    });
+    var mx = extent(mData, 0.1);
+    drawChart("chart-margin", "legend-margin", {
+      t: tAxis, lo: Math.min(-1, mx[0]), hi: mx[1], unit: "m", zero: 0,
+      series: mSeries
+    });
+
+    // Range.
+    var rSeries = [], rData = [];
+    methods.forEach(function (mk) {
+      var r = D.runs[runKey(mk)];
+      rSeries.push({ v: r.dist, color: COLORS[mk],
+                     label: state.compare ? shortLabelOf(mk) : null,
+                     legend: state.compare ? labelOf(mk) : "Gap" });
+      rData.push(r.dist);
+    });
+    var rx = extent(rData, 0.08);
+    drawChart("chart-range", "legend-range", {
+      t: tAxis, lo: 0, hi: rx[1], unit: "m", zero: CFG.captureRadius,
+      series: rSeries
+    });
+
+    var f = Math.min(state.frame, cur.t.length - 1);
+    document.getElementById("speed-rt").textContent =
+      "cmd " + cur.cmd[f].toFixed(2) + "  actual " + cur.spd[f].toFixed(2) + " m/s";
+    document.getElementById("margin-rt").textContent =
+      cur.mar[f].toFixed(2) + " m";
+    document.getElementById("range-rt").textContent =
+      cur.dist[f].toFixed(1) + " m";
+  }
+
+  function shortLabelOf(key) {
+    return labelOf(key).split(" ")[0];
+  }
+
+  function labelOf(key) {
+    for (var i = 0; i < D.methods.length; i++) {
+      if (D.methods[i].key === key) return D.methods[i].label;
+    }
+    return key;
+  }
+
+  /* ---------------- tiles + table ---------------- */
+
+  function tile(k, v, unit, bad, note) {
+    var d = document.createElement("div");
+    d.className = "tile" + (bad ? " alert" : "");
+    var kk = document.createElement("div"); kk.className = "k"; kk.textContent = k;
+    var vv = document.createElement("div"); vv.className = "v" + (bad ? " bad" : "");
+    vv.textContent = v;
+    if (unit) {
+      var u = document.createElement("span"); u.className = "u";
+      u.textContent = " " + unit; vv.appendChild(u);
+    }
+    d.appendChild(kk); d.appendChild(vv);
+    if (note) {
+      var n = document.createElement("div"); n.className = "note"; n.textContent = note;
+      d.appendChild(n);
+    }
+    return d;
+  }
+
+  function drawTiles() {
+    var m = current().metrics;
+    var host = document.getElementById("tiles");
+    host.textContent = "";
+    host.appendChild(tile("Outcome", m.captured ? "Captured" : "Escaped", "",
+      m.captured, m.captured ? "at t = " + m.tCapture + " s" : "over 12 s window"));
+    host.appendChild(tile("Command jump", m.cmdVelJump.toFixed(2), "m/s", false,
+      "at the commit instant"));
+    host.appendChild(tile("Demanded accel jump", m.cmdAccelJump.toFixed(1), "m/s\u00b2",
+      false, "(v_cmd \u2212 v) / \u03c4"));
+    host.appendChild(tile("Min margin", m.minMargin == null ? "\u2014"
+      : m.minMargin.toFixed(2), "m", m.minMargin != null && m.minMargin < 0,
+      "after commit"));
+    host.appendChild(tile("Closest approach", m.minDistance.toFixed(1), "m",
+      m.minDistance <= CFG.captureRadius, "capture at " + CFG.captureRadius + " m"));
+    host.appendChild(tile("Certificate", m.falseCert ? "False"
+      : (m.certAtCommit ? "Held" : "Refused"), "", m.falseCert,
+      m.falseCert ? "certified, then caught" : "evaluated at commit"));
+  }
+
+  function drawTable() {
+    var tb = document.querySelector("#tbl tbody");
+    tb.textContent = "";
+    D.methods.forEach(function (mt) {
+      var m = D.runs[runKey(mt.key)].metrics;
+      var tr = document.createElement("tr");
+      function cell(txt, mark) {
+        var td = document.createElement("td");
+        if (mark) {
+          var i = document.createElement("span");
+          i.className = "mk"; i.style.background = COLORS[mt.key];
+          td.appendChild(i);
+        }
+        td.appendChild(document.createTextNode(txt));
+        return td;
+      }
+      tr.appendChild(cell(mt.label, true));
+      tr.appendChild(cell(m.cmdVelJump.toFixed(2)));
+      tr.appendChild(cell(m.cmdAccelJump.toFixed(1)));
+      tr.appendChild(cell(m.peakCmdSlew.toFixed(1)));
+      tr.appendChild(cell(m.minMargin == null ? "\u2014" : m.minMargin.toFixed(2)));
+      tr.appendChild(cell(m.minDistance.toFixed(1)));
+      tr.appendChild(cell(m.captured ? "Captured " + m.tCapture + " s" : "Escaped"));
+      tb.appendChild(tr);
+    });
+  }
+
+  /* ---------------- transport ---------------- */
+
+  var playBtn = document.getElementById("play");
+  var scrub = document.getElementById("scrub");
+  var clock = document.getElementById("clock");
+
+  function setFrame(i, fromUser) {
+    state.frame = Math.max(0, Math.min(i, nFrames() - 1));
+    scrub.value = state.frame;
+    if (fromUser && state.playing) { stop(); }
+    draw();
+  }
+
+  scrub.addEventListener("input", function () {
+    setFrame(parseInt(scrub.value, 10), true);
+  });
+
+  function stop() {
+    state.playing = false;
+    playBtn.textContent = "Play";
+  }
+
+  playBtn.addEventListener("click", function () {
+    if (state.playing) { stop(); return; }
+    if (state.frame >= nFrames() - 1) { state.frame = 0; }
+    state.playing = true;
+    playBtn.textContent = "Pause";
+    last = null;
+    requestAnimationFrame(tick);
+  });
+
+  var last = null, acc = 0;
+  function tick(ts) {
+    if (!state.playing) return;
+    if (last == null) last = ts;
+    acc += (ts - last) / 1000;
+    last = ts;
+    var step = 1 / CFG.viewHz;
+    while (acc >= step) {
+      acc -= step;
+      state.frame++;
+      if (state.frame >= nFrames() - 1) {
+        state.frame = nFrames() - 1;
+        stop();
+        break;
+      }
+    }
+    scrub.value = state.frame;
+    draw();
+    if (state.playing) requestAnimationFrame(tick);
+  }
+
+  document.addEventListener("keydown", function (e) {
+    // The scrubber already handles arrows natively; stepping again here would
+    // move two frames per press.
+    if (e.target === scrub) return;
+    if (e.key === "ArrowRight") { setFrame(state.frame + 1, true); e.preventDefault(); }
+    else if (e.key === "ArrowLeft") { setFrame(state.frame - 1, true); e.preventDefault(); }
+    else if (e.key === " " && e.target.tagName !== "BUTTON") {
+      playBtn.click(); e.preventDefault();
+    }
+  });
+
+  /* ---------------- orchestration ---------------- */
+
+  function draw() {
+    drawMap();
+    drawCharts();
+    var cur = current();
+    var f = Math.min(state.frame, cur.t.length - 1);
+    clock.textContent = "t = " + cur.t[f].toFixed(2) + " s";
+  }
+
+  function refresh(resetTime) {
+    renderControls();
+    fitView();
+    scrub.max = nFrames() - 1;
+    if (resetTime) { state.frame = 0; scrub.value = 0; stop(); }
+    state.frame = Math.min(state.frame, nFrames() - 1);
+    drawTiles();
+    drawTable();
+    draw();
+  }
+
+  syncThemeLabel();
+  refresh(true);
+})();
+</script>
