@@ -85,8 +85,30 @@ class Result:
     t_capture: Optional[float] = None
     captured_after_commit: bool = False
 
+    # Did the handover ever happen?  A case caught before t = h never commits,
+    # so every commit-time field below is left at its default.  Those cases
+    # must be excluded from any statistic about the switch, or they read as
+    # "zero jolt" and drag the averages down.
+    committed: bool = False
+
     cert_held_at_commit: bool = False
     false_certificate: bool = False
+
+    # Was the drone still flying the surveillance circle on the step before
+    # commit?  Always true for `defer`, always false for `stop_first` and
+    # `prepare`, and case-dependent for `forecast_forward`.  This is what makes
+    # the handoff's claim -- that the jolt is largest when the drone switches
+    # straight from surveying -- a measurable one.
+    surveying_at_commit: bool = False
+
+    # Angle in degrees between the drone's velocity at commit and the direction
+    # it is about to flee in.  0 means already pointing away, 180 means
+    # pointing straight at the pursuer.  Unlike `surveying_at_commit` this is
+    # continuous and says nothing about which controller was active, so it
+    # survives any re-definition of the wait policies -- which makes it the
+    # honest way to test the handoff's claim that the jolt is largest when the
+    # drone switches straight out of surveying.
+    turn_angle_at_commit: float = 0.0
 
     min_margin_after_commit: float = float("inf")
     min_distance: float = float("inf")
@@ -138,6 +160,14 @@ def _forecast_safe_at_commit(
 
     This is the handoff's `forecast_forward` check: keep surveying only when it
     can be proved that the drone is still safe at the moment of the switch.
+
+    Note the degeneracy as `t_to_commit` shrinks: with nothing left to predict,
+    the question collapses to "is the margin non-negative at this instant",
+    which is nearly always true just before commit.  Re-evaluating freely would
+    therefore flip the gate back to surveying on the last step or two whatever
+    the geometry, producing a one-step command reversal that is an artefact of
+    the sample rate rather than a policy.  `run` latches the gate to stop that;
+    see `gate_latched` there.
     """
     if t_to_commit <= 0.0:
         return True
@@ -193,6 +223,16 @@ def run(scenario: Scenario) -> Result:
     last_cmd = evader_vel                 # outgoing controller's command
     prev_cmd: Optional[Vec2] = None
     t_commit = scenario.h
+    # True at t = 0: the drone is on its surveillance circle when detection
+    # happens, so an immediate commit (h = 0) does switch straight from
+    # surveying.
+    last_surveying = True
+    # The controller the blend hands over *from*. Reassigned every pre-commit
+    # step, so at commit it holds whichever one was actually flying.
+    outgoing_ctrl = surveil if scenario.policy == "defer" else waiter
+    # forecast_forward only: once the gate gives up on surveying it stays
+    # given up, so the decision cannot reverse as the horizon shrinks.
+    gate_latched = False
 
     n_steps = int(round(p.t_eval / dt))
     for i in range(n_steps + 1):
@@ -218,22 +258,45 @@ def run(scenario: Scenario) -> Result:
             startup.on_commit(evader, escape, last_cmd)
             committed = True
             just_committed = True
+            result.committed = True
             result.cert_held_at_commit = m >= 0.0
+            result.surveying_at_commit = last_surveying
+
+            away = (evader.pos - est.pos).unit()
+            heading = evader.vel.unit()
+            if away.norm > 0.0 and heading.norm > 0.0:
+                cos = max(-1.0, min(1.0, heading.dot(away)))
+                result.turn_angle_at_commit = math.degrees(math.acos(cos))
 
         # --- pick a command --------------------------------------------------
         if committed:
             escape_cmd = escape.command(t, evader, est, dt)
-            outgoing = surveil.command(t, evader, est, dt)
+            # Classical bumpless transfer blends from the *outgoing* controller,
+            # which keeps running.  That is whichever controller was flying the
+            # drone on the step before commit -- not always the surveillance
+            # one, since `prepare` and `stop_first` fly something else.  Using
+            # surveillance unconditionally put a discontinuity into the blend
+            # under every policy except `defer`.
+            outgoing = outgoing_ctrl.command(t, evader, est, dt)
             v_cmd = startup.command(
                 t - t_commit, escape_cmd, outgoing, evader, est, p
             )
         else:
-            if scenario.policy == "forecast_forward" and _forecast_safe_at_commit(
-                evader, est, t_commit - t, surveil, p
-            ):
+            if (scenario.policy == "forecast_forward"
+                    and not gate_latched
+                    and _forecast_safe_at_commit(
+                        evader, est, t_commit - t, surveil, p)):
+                outgoing_ctrl = surveil
                 v_cmd = surveil.command(t, evader, est, dt)
+                last_surveying = True
             else:
+                outgoing_ctrl = waiter
                 v_cmd = waiter.command(t, evader, est, dt)
+                last_surveying = isinstance(waiter, SurveillanceController)
+                # Once the forecast cannot prove safety, stay turned away. The
+                # alternative is un-preparing as the horizon shrinks, which is
+                # both unsafe-looking and a sample-rate artefact.
+                gate_latched = True
 
         # --- metrics ---------------------------------------------------------
         # Acceleration demanded of the speed loop, before the cap bites.

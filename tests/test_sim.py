@@ -219,6 +219,161 @@ class TestJoltMetrics(unittest.TestCase):
         self.assertTrue(math.isfinite(r.min_margin_after_commit))
 
 
+class TestBlendHandsOverFromTheRightController(unittest.TestCase):
+    """A blend must start from whatever was actually flying the drone.
+
+    Blending from the surveillance controller unconditionally put a real
+    discontinuity into every policy except `defer`, where the two happen to
+    coincide -- which is why it went unnoticed.
+    """
+
+    COMMON = dict(detect_range=25.0, bearing=HEAD_ON, h=1.0, v_flee=8.0)
+
+    def _jump(self, policy, startup):
+        p = FAST.with_(v_max=8.0)
+        return run(Scenario(policy=policy, startup=startup, params=p,
+                            **self.COMMON)).cmd_vel_jump
+
+    def test_blend_is_continuous_under_every_wait_policy(self):
+        for policy in WAIT_POLICIES:
+            with self.subTest(policy=policy):
+                self.assertLess(self._jump(policy, blend(0.5)), 0.05)
+
+    def test_blend_beats_cold_under_every_wait_policy(self):
+        for policy in WAIT_POLICIES:
+            with self.subTest(policy=policy):
+                self.assertLess(self._jump(policy, blend(0.5)),
+                                self._jump(policy, cold()))
+
+    def test_prepare_is_the_case_that_used_to_break(self):
+        """Pinned explicitly: under prepare the outgoing command is the turn-away
+        command, not the surveillance one."""
+        self.assertLess(self._jump("prepare", blend(0.5)), 0.05)
+
+
+class TestCommittedFlag(unittest.TestCase):
+    """A case caught before t = h never hands over, and its commit-time fields
+    are therefore meaningless rather than zero."""
+
+    def test_committed_is_true_for_a_normal_run(self):
+        r = run(Scenario(detect_range=40.0, bearing=HEAD_ON, h=1.0, params=FAST))
+        self.assertTrue(r.committed)
+
+    def test_committed_is_false_when_caught_before_the_hold_expires(self):
+        r = run(Scenario(detect_range=4.0, bearing=HEAD_ON, h=2.0,
+                         policy="defer", params=FAST))
+        self.assertTrue(r.captured)
+        self.assertLess(r.t_capture, 2.0)
+        self.assertFalse(r.committed)
+        self.assertFalse(r.captured_after_commit)
+
+    def test_an_uncommitted_case_reports_no_jolt_and_must_not_be_counted(self):
+        r = run(Scenario(detect_range=4.0, bearing=HEAD_ON, h=2.0,
+                         policy="defer", startup=cold(), params=FAST))
+        self.assertFalse(r.committed)
+        self.assertEqual(r.cmd_vel_jump, 0.0)
+        self.assertFalse(r.surveying_at_commit)
+
+
+class TestSurveyingAtCommit(unittest.TestCase):
+    def test_defer_is_always_surveying_at_commit(self):
+        r = run(Scenario(detect_range=40.0, bearing=HEAD_ON, h=1.0,
+                         policy="defer", params=FAST))
+        self.assertTrue(r.surveying_at_commit)
+
+    def test_prepare_is_never_surveying_at_commit(self):
+        r = run(Scenario(detect_range=40.0, bearing=HEAD_ON, h=1.0,
+                         policy="prepare", params=FAST))
+        self.assertFalse(r.surveying_at_commit)
+
+    def test_stop_first_is_never_surveying_at_commit(self):
+        r = run(Scenario(detect_range=40.0, bearing=HEAD_ON, h=1.0,
+                         policy="stop_first", params=FAST))
+        self.assertFalse(r.surveying_at_commit)
+
+    def test_forecast_forward_surveys_when_it_is_safe_to(self):
+        """Far away there is no reason to stop surveying."""
+        r = run(Scenario(detect_range=55.0, bearing=HEAD_ON, h=1.0,
+                         policy="forecast_forward", params=FAST))
+        self.assertTrue(r.surveying_at_commit)
+
+    def test_forecast_forward_turns_when_it_cannot_prove_safety(self):
+        r = run(Scenario(detect_range=12.0, bearing=HEAD_ON, h=2.0,
+                         policy="forecast_forward", params=FAST))
+        self.assertFalse(r.surveying_at_commit)
+
+
+class TestForecastGateIsLatched(unittest.TestCase):
+    """Once forecast_forward gives up on surveying it must stay given up.
+
+    Without the latch the gate flips back to surveying on the last step or two
+    before commit, because a forecast over a vanishing horizon collapses into
+    "is the margin non-negative right now". That one-step reversal is a
+    sample-rate artefact, and it was inflating the measured jolt.
+    """
+
+    def _hold_commands(self, dt):
+        p = FAST.with_(dt=dt, v_max=8.0)
+        r = run(Scenario(detect_range=11.2, bearing=math.radians(315), h=2.0,
+                         policy="forecast_forward", startup=warm(),
+                         v_flee=8.0, params=p))
+        return r, [s for s in r.trace if not s.committed]
+
+    def test_the_command_does_not_reverse_just_before_commit(self):
+        r, hold = self._hold_commands(0.005)
+        last = hold[-1].cmd
+        earlier = hold[-40].cmd            # 0.2 s before commit
+        self.assertLess((last - earlier).norm, 0.5)
+
+    def test_a_case_that_prepares_throughout_reports_not_surveying(self):
+        r, hold = self._hold_commands(0.005)
+        self.assertFalse(r.surveying_at_commit)
+
+    def test_the_measured_jolt_no_longer_depends_on_the_step_size(self):
+        """The artefact showed up as a jolt that changed with dt."""
+        jumps = [self._hold_commands(dt)[0].cmd_vel_jump
+                 for dt in (0.01, 0.005, 0.0025)]
+        self.assertLess(max(jumps) - min(jumps), 0.3)
+
+    def test_an_easy_geometry_still_keeps_surveying(self):
+        """The latch must not stop the gate from ever surveying."""
+        r = run(Scenario(detect_range=55.0, bearing=HEAD_ON, h=1.0,
+                         policy="forecast_forward", params=FAST))
+        self.assertTrue(r.surveying_at_commit)
+
+
+class TestTurnAngleAtCommit(unittest.TestCase):
+    """A continuous measure of how far the drone still has to turn."""
+
+    def test_prepare_commits_already_pointing_away(self):
+        r = run(Scenario(detect_range=40.0, bearing=HEAD_ON, h=2.0,
+                         policy="prepare", params=FAST.with_(v_max=8.0),
+                         v_flee=8.0))
+        self.assertLess(r.turn_angle_at_commit, 20.0)
+
+    def test_defer_head_on_commits_pointing_the_wrong_way(self):
+        r = run(Scenario(detect_range=40.0, bearing=HEAD_ON, h=1.0,
+                         policy="defer", params=FAST.with_(v_max=8.0),
+                         v_flee=8.0))
+        self.assertGreater(r.turn_angle_at_commit, 60.0)
+
+    def test_the_angle_is_within_range(self):
+        for policy in WAIT_POLICIES:
+            for bearing in (HEAD_ON, BROADSIDE, FROM_BEHIND):
+                with self.subTest(policy=policy, bearing=bearing):
+                    r = run(Scenario(detect_range=30.0, bearing=bearing, h=1.0,
+                                     policy=policy, params=FAST))
+                    self.assertGreaterEqual(r.turn_angle_at_commit, 0.0)
+                    self.assertLessEqual(r.turn_angle_at_commit, 180.0)
+
+    def test_a_longer_hold_leaves_less_to_turn_under_prepare(self):
+        def angle(h):
+            return run(Scenario(detect_range=40.0, bearing=HEAD_ON, h=h,
+                                policy="prepare", params=FAST.with_(v_max=8.0),
+                                v_flee=8.0)).turn_angle_at_commit
+        self.assertGreater(angle(0.5), angle(2.0))
+
+
 class TestCertificateReporting(unittest.TestCase):
     def test_a_far_pursuer_certifies_at_commit(self):
         r = run(Scenario(detect_range=50.0, bearing=HEAD_ON, params=FAST))

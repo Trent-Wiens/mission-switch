@@ -4,7 +4,7 @@
   :root {
     color-scheme: light dark;
 
-    /* Neutrals, biased slate &mdash; instrument housing, not pure grey. */
+    /* Neutrals, biased slate - instrument housing, not pure grey. */
     --bg:        #F6F7F8;
     --surface:   #FFFFFF;
     --surface-2: #EDEFF2;
@@ -14,7 +14,7 @@
     --ink-2:     #4A5460;
     --ink-3:     #7C8694;
 
-    /* Data colours. Validated categorical set &mdash; the only chroma on the page. */
+    /* Data colours. Validated categorical set - the only chroma on the page. */
     --m-cold:     #2E6FD9;
     --m-warm:     #C77A1E;
     --m-blend:    #1F8A70;
@@ -88,12 +88,12 @@
     padding: 28px 24px 56px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 18px;
   }
 
   /* ---------- header ---------- */
 
-  header { display: flex; flex-direction: column; gap: 10px; }
+  header { display: flex; flex-direction: column; gap: 8px; }
 
   h1 {
     font-family: var(--mono);
@@ -103,7 +103,7 @@
     text-wrap: balance;
   }
 
-  .sub { color: var(--ink-2); max-width: 62ch; }
+  .sub { color: var(--ink-2); max-width: 64ch; }
 
   .spec {
     display: flex;
@@ -125,11 +125,11 @@
   .controls {
     display: flex;
     flex-wrap: wrap;
-    gap: 18px 28px;
+    gap: 14px 24px;
     align-items: flex-end;
   }
 
-  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 
   .lbl {
     font-family: var(--mono);
@@ -160,13 +160,11 @@
     font-variant-numeric: tabular-nums;
   }
   .seg button:last-child { border-right: 0; }
-  .seg button:hover { background: var(--surface-2); color: var(--ink); }
+  .seg button:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+  .seg button:disabled { opacity: 0.32; cursor: not-allowed; }
 
-  /* Active state inverts to ink &mdash; no hue, so chroma stays reserved for data. */
-  .seg button[aria-pressed="true"] {
-    background: var(--ink);
-    color: var(--bg);
-  }
+  /* Active state inverts to ink - no hue, so chroma stays reserved for data. */
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
   .seg button[aria-pressed="true"]:hover { background: var(--ink); }
 
   .seg button .swatch {
@@ -177,7 +175,19 @@
     vertical-align: 1px;
   }
 
-  button:focus-visible, input:focus-visible, a:focus-visible {
+  select.casepick {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 6px 9px;
+    max-width: 460px;
+    cursor: pointer;
+  }
+
+  button:focus-visible, input:focus-visible, select:focus-visible {
     outline: 2px solid var(--ink);
     outline-offset: 2px;
   }
@@ -186,14 +196,16 @@
 
   .main {
     display: grid;
-    grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
-    gap: 20px;
+    grid-template-columns: minmax(0, 470px) minmax(0, 1fr);
+    gap: 18px;
     align-items: start;
   }
 
   @media (max-width: 920px) {
     .main { grid-template-columns: minmax(0, 1fr); }
   }
+
+  .left-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
   .panel {
     background: var(--surface);
@@ -248,12 +260,7 @@
   }
   .tbtn:hover { background: var(--line-soft); }
 
-  #scrub {
-    flex: 1;
-    min-width: 0;
-    accent-color: var(--ink);
-    cursor: pointer;
-  }
+  #scrub { flex: 1; min-width: 0; accent-color: var(--ink); cursor: pointer; }
 
   .clock {
     font-family: var(--mono);
@@ -312,17 +319,10 @@
     color: var(--ink-2);
   }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .legend i {
-    width: 14px; height: 2px; border-radius: 1px;
-    display: inline-block;
-  }
-  .legend i.dash {
-    height: 0; border-top: 2px dashed currentColor; border-radius: 0;
-  }
+  .legend i { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+  .legend i.dash { height: 0; border-top: 2px dashed currentColor; border-radius: 0; }
 
   /* ---------- tiles ---------- */
-
-  .left-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
   .tiles {
     display: grid;
@@ -394,6 +394,16 @@
     margin-right: 7px;
   }
 
+  .note-strip {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-2);
+    background: var(--surface-2);
+    border-left: 2px solid var(--ink-3);
+    padding: 7px 11px;
+    border-radius: 0 var(--r) var(--r) 0;
+  }
+
   footer {
     color: var(--ink-3);
     font-size: 12px;
@@ -416,8 +426,8 @@
 <div class="wrap">
 
   <header>
-    <h1>Starting the escape controller without a jolt</h1>
-    <p class="sub">
+    <h1 id="title">Starting the escape controller without a jolt</h1>
+    <p class="sub" id="subtitle">
       Replay of the handover instant. The drone surveys until a pursuer is
       detected at <i>t</i>&nbsp;=&nbsp;0, waits out the hold, then commits to an
       escape controller. Scrub to see what the controller commanded against what
@@ -426,43 +436,26 @@
     <div class="spec" id="spec"></div>
   </header>
 
-  <div class="controls">
-    <div class="field">
-      <span class="lbl" id="lbl-appr">Approach</span>
-      <div class="seg" id="seg-bearing" role="group" aria-labelledby="lbl-appr"></div>
-    </div>
-    <div class="field">
-      <span class="lbl" id="lbl-rng">Detection range</span>
-      <div class="seg" id="seg-range" role="group" aria-labelledby="lbl-rng"></div>
-    </div>
-    <div class="field">
-      <span class="lbl" id="lbl-mth">Start-up method</span>
-      <div class="seg" id="seg-method" role="group" aria-labelledby="lbl-mth"></div>
-    </div>
-    <div class="field">
-      <span class="lbl" id="lbl-thm">Theme</span>
-      <div class="seg" role="group" aria-labelledby="lbl-thm">
-        <button type="button" id="theme-toggle">Dark</button>
-      </div>
-    </div>
-  </div>
+  <div class="controls" id="controls"></div>
+
+  <div id="note-host"></div>
 
   <div class="main">
 
     <div class="left-col">
-    <section class="panel">
-      <div class="panel-hd">
-        <span>Plan view</span>
-        <span class="rt" id="map-rt"></span>
-      </div>
-      <canvas id="map" width="960" height="960" role="img"
-              aria-label="Top-down view of the drone and pursuer trajectories"></canvas>
-      <div class="transport">
-        <button class="tbtn" id="play" type="button">Play</button>
-        <input type="range" id="scrub" min="0" max="240" value="0" step="1"
-               aria-label="Scrub through time" />
-        <span class="clock" id="clock"></span>
-      </div>
+      <section class="panel">
+        <div class="panel-hd">
+          <span>Plan view</span>
+          <span class="rt" id="map-rt"></span>
+        </div>
+        <canvas id="map" width="960" height="960" role="img"
+                aria-label="Top-down view of the drone and pursuer trajectories"></canvas>
+        <div class="transport">
+          <button class="tbtn" id="play" type="button">Play</button>
+          <input type="range" id="scrub" min="0" max="100" value="0" step="1"
+                 aria-label="Scrub through time" />
+          <span class="clock" id="clock"></span>
+        </div>
       </section>
 
       <div class="tiles" id="tiles"></div>
@@ -525,10 +518,10 @@
   </details>
 
   <footer>
-    Generated from the simulator in <code>Code/</code>. Regenerate with
-    <code>python3 export_viz.py</code>. Every run here uses the deferring wait
-    policy, so the switch happens straight out of surveillance, which is where
-    the jolt is largest. A simulation sweep is evidence, not a proof.
+    Generated from the simulator in <code>Code/</code>. Any case in the grid can be
+    replayed with <code>python3 replay.py</code> &mdash; the simulator is
+    deterministic, so a case only has to be identified, never stored.
+    A simulation sweep is evidence, not a proof.
   </footer>
 </div>
 
@@ -541,150 +534,308 @@
   if (!D) { document.body.innerHTML = "<p>runs.js failed to load.</p>"; return; }
 
   var CFG = D.config;
+  var CASES = D.cases;
+  var METHOD_LABELS = D.methodLabels || {};
   var COLORS = {
     cold: "#2E6FD9", warm: "#C77A1E", blend: "#1F8A70", filtered: "#B5379A"
   };
+
   function css(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
 
-  var state = {
-    bearing: D.bearings[0].key,
-    range: D.ranges[1],
-    method: "cold",
-    compare: false,
-    frame: 0,
-    playing: false
-  };
+  /* ---------------- dimensions ----------------
+     The controls are derived from whatever was exported, so the same viewer
+     serves a clean cross-product sweep and a hand-picked set of cases for a
+     talk. A dimension with only one distinct value gets no control. */
 
-  function runKey(method) {
-    return state.bearing + "|" + fmtRange(state.range) + "|" + method;
-  }
-  function fmtRange(r) { return String(r).replace(/\.0$/, ""); }
-  function current() { return D.runs[runKey(state.method)]; }
+  var DIMS = [
+    { key: "policy",       label: "Wait policy", fmt: function (v) { return v; } },
+    { key: "bearing_deg",  label: "Approach",    fmt: bearingLabel },
+    { key: "detect_range", label: "Detection range", fmt: function (v) { return v + " m"; } },
+    { key: "h",            label: "Hold h",      fmt: function (v) { return v + " s"; } },
+    { key: "tau",          label: "Tau",         fmt: function (v) { return v + " s"; } },
+    { key: "method",       label: "Start-up method",
+      fmt: function (v) { return METHOD_LABELS[v] || v; },
+      color: function (v) { return COLORS[v]; } }
+  ];
 
-  function shownMethods() {
-    return state.compare ? D.methods.map(function (m) { return m.key; })
-                         : [state.method];
-  }
-
-  // Captured runs stop at the capture instant, so lengths differ. The
-  // transport spans the longest run on screen; shorter ones simply end.
-  function nFrames() {
-    return shownMethods().reduce(function (n, mk) {
-      return Math.max(n, D.runs[runKey(mk)].t.length);
-    }, 1);
+  function bearingLabel(deg) {
+    var named = { 0: "Head-on", 90: "Broadside", 180: "From behind",
+                  270: "Broadside (right)" };
+    var k = ((deg % 360) + 360) % 360;
+    return named[k] != null ? named[k] : k + "\u00b0";
   }
 
-  // The time axis has to come from the longest run too, not from `current()`.
-  function timeAxis() {
-    var best = current();
-    shownMethods().forEach(function (mk) {
-      var r = D.runs[runKey(mk)];
-      if (r.t.length > best.t.length) best = r;
+  var METHOD_ORDER = ["cold", "warm", "blend", "filtered"];
+
+  function distinct(key) {
+    var seen = [];
+    CASES.forEach(function (c) {
+      var v = c.meta[key];
+      if (seen.indexOf(v) === -1) seen.push(v);
     });
+    if (key === "method") {
+      seen.sort(function (a, b) {
+        return METHOD_ORDER.indexOf(a) - METHOD_ORDER.indexOf(b);
+      });
+    } else {
+      seen.sort(function (a, b) {
+        return (typeof a === "number") ? a - b : String(a).localeCompare(String(b));
+      });
+    }
+    return seen;
+  }
+
+  var ACTIVE_DIMS = DIMS.filter(function (d) { return distinct(d.key).length > 1; });
+
+  var state = { sel: {}, compare: false, frame: 0, playing: false };
+  DIMS.forEach(function (d) { state.sel[d.key] = CASES[0].meta[d.key]; });
+
+  /* Find the case matching the current selection. If the exported set is not a
+     full cross-product, fall back to the closest match on the dimensions that
+     have controls, so the viewer never shows an empty screen. */
+  function findCase(overrides) {
+    var want = {};
+    DIMS.forEach(function (d) { want[d.key] = state.sel[d.key]; });
+    if (overrides) {
+      for (var k in overrides) { want[k] = overrides[k]; }
+    }
+    var exact = CASES.filter(function (c) {
+      return DIMS.every(function (d) { return c.meta[d.key] === want[d.key]; });
+    });
+    if (exact.length) return exact[0];
+
+    var best = null, bestScore = -1;
+    CASES.forEach(function (c) {
+      var score = DIMS.reduce(function (n, d) {
+        return n + (c.meta[d.key] === want[d.key] ? 1 : 0);
+      }, 0);
+      if (score > bestScore) { bestScore = score; best = c; }
+    });
+    return best;
+  }
+
+  function current() { return findCase(null); }
+
+  /* Cases differing only by start-up method - what "compare" overlays. */
+  function siblings(c) {
+    return CASES.filter(function (o) {
+      return DIMS.every(function (d) {
+        return d.key === "method" || o.meta[d.key] === c.meta[d.key];
+      });
+    }).sort(function (a, b) {
+      return METHOD_ORDER.indexOf(a.meta.method) - METHOD_ORDER.indexOf(b.meta.method);
+    });
+  }
+
+  function shown() {
+    var c = current();
+    return state.compare ? siblings(c) : [c];
+  }
+
+  function colorOf(c) { return COLORS[c.meta.method] || css("--ink-2"); }
+  function shortOf(c) {
+    return (METHOD_LABELS[c.meta.method] || c.meta.method).split(" ")[0];
+  }
+
+  function nFrames() {
+    return shown().reduce(function (n, c) { return Math.max(n, c.t.length); }, 1);
+  }
+  function timeAxis() {
+    var best = shown()[0];
+    shown().forEach(function (c) { if (c.t.length > best.t.length) best = c; });
     return best.t;
   }
 
   /* ---------------- controls ---------------- */
 
-  function buildSeg(el, items, isOn, onPick) {
-    el.textContent = "";
-    items.forEach(function (it) {
-      var b = document.createElement("button");
-      b.type = "button";
-      if (it.color) {
-        var sw = document.createElement("span");
-        sw.className = "swatch";
-        sw.style.background = it.color;
-        b.appendChild(sw);
-      }
-      b.appendChild(document.createTextNode(it.label));
-      b.setAttribute("aria-pressed", isOn(it) ? "true" : "false");
-      b.addEventListener("click", function () { onPick(it); });
-      el.appendChild(b);
-    });
-  }
-
   function renderControls() {
-    buildSeg(
-      document.getElementById("seg-bearing"),
-      D.bearings,
-      function (it) { return it.key === state.bearing; },
-      function (it) { state.bearing = it.key; refresh(true); }
-    );
-    buildSeg(
-      document.getElementById("seg-range"),
-      D.ranges.map(function (r) { return { key: r, label: fmtRange(r) + " m" }; }),
-      function (it) { return it.key === state.range; },
-      function (it) { state.range = it.key; refresh(true); }
-    );
-    var methodItems = D.methods.map(function (m) {
-      return { key: m.key, label: m.label, color: COLORS[m.key] };
-    });
-    methodItems.push({ key: "__all", label: "Compare all" });
-    buildSeg(
-      document.getElementById("seg-method"),
-      methodItems,
-      function (it) {
-        return it.key === "__all" ? state.compare
-                                  : (!state.compare && it.key === state.method);
-      },
-      function (it) {
-        if (it.key === "__all") { state.compare = true; }
-        else { state.compare = false; state.method = it.key; }
-        refresh(false);
+    var host = document.getElementById("controls");
+    host.textContent = "";
+
+    ACTIVE_DIMS.forEach(function (d) {
+      var values = distinct(d.key);
+      var field = document.createElement("div");
+      field.className = "field";
+      var lbl = document.createElement("span");
+      lbl.className = "lbl";
+      lbl.textContent = d.label;
+      field.appendChild(lbl);
+
+      // More than eight options is a dropdown; a segmented control would wrap
+      // into an unreadable block.
+      if (values.length > 8) {
+        var sel = document.createElement("select");
+        sel.className = "casepick";
+        values.forEach(function (v) {
+          var o = document.createElement("option");
+          o.value = String(v);
+          o.textContent = d.fmt(v);
+          if (v === state.sel[d.key]) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener("change", function () {
+          var raw = sel.value;
+          var v = values.filter(function (x) { return String(x) === raw; })[0];
+          state.sel[d.key] = v;
+          refresh(true);
+        });
+        field.appendChild(sel);
+      } else {
+        var seg = document.createElement("div");
+        seg.className = "seg";
+        seg.setAttribute("role", "group");
+        values.forEach(function (v) {
+          var b = document.createElement("button");
+          b.type = "button";
+          if (d.color && d.color(v)) {
+            var sw = document.createElement("span");
+            sw.className = "swatch";
+            sw.style.background = d.color(v);
+            b.appendChild(sw);
+          }
+          b.appendChild(document.createTextNode(d.fmt(v)));
+          var on = state.sel[d.key] === v;
+          b.setAttribute("aria-pressed", on ? "true" : "false");
+          if (d.key === "method" && state.compare) {
+            b.setAttribute("aria-pressed", "false");
+          }
+          b.addEventListener("click", function () {
+            state.sel[d.key] = v;
+            if (d.key === "method") state.compare = false;
+            refresh(d.key !== "method");
+          });
+          seg.appendChild(b);
+        });
+        field.appendChild(seg);
       }
-    );
+      host.appendChild(field);
+    });
+
+    // Compare toggle, only when there is more than one method to compare.
+    if (distinct("method").length > 1) {
+      var cf = document.createElement("div");
+      cf.className = "field";
+      var cl = document.createElement("span");
+      cl.className = "lbl";
+      cl.textContent = "Overlay";
+      cf.appendChild(cl);
+      var cs = document.createElement("div");
+      cs.className = "seg";
+      var cb = document.createElement("button");
+      cb.type = "button";
+      cb.textContent = "Compare methods";
+      cb.setAttribute("aria-pressed", state.compare ? "true" : "false");
+      cb.addEventListener("click", function () {
+        state.compare = !state.compare;
+        refresh(false);
+      });
+      cs.appendChild(cb);
+      cf.appendChild(cs);
+      host.appendChild(cf);
+    }
+
+    // Direct case picker - the fallback for a hand-picked, non-rectangular set.
+    if (CASES.length > 1) {
+      var pf = document.createElement("div");
+      pf.className = "field";
+      var pl = document.createElement("span");
+      pl.className = "lbl";
+      pl.textContent = "Jump to case";
+      pf.appendChild(pl);
+      var ps = document.createElement("select");
+      ps.className = "casepick";
+      CASES.forEach(function (c, i) {
+        var o = document.createElement("option");
+        o.value = String(i);
+        o.textContent = (c.meta.note ? c.meta.note + " \u2014 " : "") + c.label;
+        if (c === current()) o.selected = true;
+        ps.appendChild(o);
+      });
+      ps.addEventListener("change", function () {
+        var c = CASES[parseInt(ps.value, 10)];
+        DIMS.forEach(function (d) { state.sel[d.key] = c.meta[d.key]; });
+        state.compare = false;
+        refresh(true);
+      });
+      pf.appendChild(ps);
+      host.appendChild(pf);
+    }
+
+    var tf = document.createElement("div");
+    tf.className = "field";
+    var tl = document.createElement("span");
+    tl.className = "lbl";
+    tl.textContent = "Theme";
+    tf.appendChild(tl);
+    var ts = document.createElement("div");
+    ts.className = "seg";
+    var tb = document.createElement("button");
+    tb.type = "button";
+    tb.id = "theme-toggle";
+    tb.textContent = isDark() ? "Light" : "Dark";
+    tb.addEventListener("click", function () {
+      document.documentElement.setAttribute("data-theme", isDark() ? "light" : "dark");
+      tb.textContent = isDark() ? "Light" : "Dark";
+      draw();
+    });
+    ts.appendChild(tb);
+    tf.appendChild(ts);
+    host.appendChild(tf);
   }
 
-  document.getElementById("spec").innerHTML = [
-    ["hold h", CFG.h + " s"],
-    ["tau", CFG.tau + " s"],
-    ["flee speed", CFG.vFlee + " m/s"],
-    ["pursuer", CFG.vPursuer + " m/s"],
-    ["capture", CFG.captureRadius + " m"],
-    ["accel cap", CFG.aMax + " m/s\u00b2"]
-  ].map(function (p) {
-    return "<span>" + p[0] + " <b>" + p[1] + "</b></span>";
-  }).join("");
+  function renderSpec() {
+    var c = current();
+    var rows = [
+      ["policy", c.meta.policy],
+      ["hold h", c.meta.h + " s"],
+      ["tau", c.meta.tau + " s"],
+      ["flee speed", (c.meta.vFlee == null ? "uncapped" : c.meta.vFlee + " m/s")],
+      ["pursuer", CFG.vPursuer + " m/s"],
+      ["capture", CFG.captureRadius + " m"],
+      ["accel cap", CFG.aMax + " m/s\u00b2"]
+    ];
+    document.getElementById("spec").innerHTML = rows.map(function (p) {
+      return "<span>" + p[0] + " <b>" + p[1] + "</b></span>";
+    }).join("");
 
-  /* ---------------- theme ---------------- */
+    var noteHost = document.getElementById("note-host");
+    noteHost.textContent = "";
+    if (c.meta.note) {
+      var d = document.createElement("div");
+      d.className = "note-strip";
+      d.textContent = c.meta.note;
+      noteHost.appendChild(d);
+    }
+  }
 
-  var themeBtn = document.getElementById("theme-toggle");
   function isDark() {
     var set = document.documentElement.getAttribute("data-theme");
     if (set) return set === "dark";
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   }
-  function syncThemeLabel() { themeBtn.textContent = isDark() ? "Light" : "Dark"; }
-  themeBtn.addEventListener("click", function () {
-    document.documentElement.setAttribute("data-theme", isDark() ? "light" : "dark");
-    syncThemeLabel();
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+    var tb = document.getElementById("theme-toggle");
+    if (tb) tb.textContent = isDark() ? "Light" : "Dark";
     draw();
   });
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
-    syncThemeLabel(); draw();
-  });
+
+  if (D.title) { document.getElementById("title").textContent = D.title; }
+  if (D.subtitle) { document.getElementById("subtitle").textContent = D.subtitle; }
 
   /* ---------------- plan view ---------------- */
 
   var cv = document.getElementById("map");
   var ctx = cv.getContext("2d");
-
-  // Metres across the canvas. Fitted to the whole selection once, not per
-  // frame, so the scale holds still while the replay runs.
   var VIEW = 120;
 
   function fitView() {
-    var methods = state.compare ? D.methods.map(function (m) { return m.key; })
-                                : [state.method];
     var reach = CFG.surveilRadius * 1.2;
-    methods.forEach(function (mk) {
-      var r = D.runs[runKey(mk)];
-      for (var i = 0; i < r.ex.length; i++) {
-        reach = Math.max(reach, Math.hypot(r.ex[i], r.ey[i]),
-                                Math.hypot(r.px[i], r.py[i]));
+    shown().forEach(function (c) {
+      for (var i = 0; i < c.ex.length; i++) {
+        reach = Math.max(reach, Math.hypot(c.ex[i], c.ey[i]),
+                                Math.hypot(c.px[i], c.py[i]));
       }
     });
     VIEW = Math.max(90, reach * 2.2);
@@ -734,10 +885,9 @@
 
   function chevron(x, y, dx, dy, sizePx, fill) {
     var p = toPx(x, y);
-    var a = Math.atan2(-dy, dx);
     ctx.save();
     ctx.translate(p[0], p[1]);
-    ctx.rotate(a);
+    ctx.rotate(Math.atan2(-dy, dx));
     ctx.beginPath();
     ctx.moveTo(sizePx, 0);
     ctx.lineTo(-sizePx * 0.75, sizePx * 0.72);
@@ -766,8 +916,6 @@
     ctx.fillStyle = surf;
     ctx.fillRect(0, 0, cv.width, cv.height);
 
-    // Geofence and surveillance circle &mdash; the fixed furniture of the scene.
-    // The fence may fall outside the fitted view; its arc simply clips.
     circle(0, 0, CFG.geofenceRadius, lineC, 2, [10, 8]);
     circle(0, 0, CFG.surveilRadius, lineC, 1.5, [3, 6]);
     ctx.font = "500 15px ui-monospace, SFMono-Regular, Menlo, monospace";
@@ -780,60 +928,49 @@
     ctx.fillText("SURVEY " + CFG.surveilRadius + " m", toPx(0, 0)[0] + 8,
                  toPx(0, -CFG.surveilRadius)[1] - 10);
 
-    var methods = shownMethods();
+    var list = shown();
     var f = Math.min(state.frame, nFrames() - 1);
-    var commitIdx = Math.round(CFG.h * CFG.viewHz);
 
-    // The pursuer chases whichever evader it is given, so its track differs by
-    // method. Draw one per method, always in neutral ink so it never competes
-    // with a series colour; form and label carry its identity, not hue.
-    // Ghost of the whole run underneath, so the scene reads at t = 0 and the
-    // travelled portion is legible as progress along a known path.
+    // Ghost of the whole run, so the scene reads at t = 0.
     ctx.globalAlpha = 0.34;
-    methods.forEach(function (mk) {
-      var r = D.runs[runKey(mk)];
-      polyline(r.ex, r.ey, r.t.length - 1, COLORS[mk], 2.5);
-      polyline(r.px, r.py, r.t.length - 1, ink3, 2);
+    list.forEach(function (c) {
+      polyline(c.ex, c.ey, c.t.length - 1, colorOf(c), 2.5);
+      polyline(c.px, c.py, c.t.length - 1, ink3, 2);
     });
     ctx.globalAlpha = 1;
 
-    methods.forEach(function (mk) {
-      var r = D.runs[runKey(mk)];
-      polyline(r.px, r.py, Math.min(f, r.t.length - 1), ink3, 2, [6, 5]);
+    list.forEach(function (c) {
+      polyline(c.px, c.py, Math.min(f, c.t.length - 1), ink3, 2, [6, 5]);
     });
 
-    methods.forEach(function (mk) {
-      var r = D.runs[runKey(mk)];
-      var ff = Math.min(f, r.t.length - 1);
-      polyline(r.ex, r.ey, ff, COLORS[mk], 3);
-      if (ff >= commitIdx) {
-        dot(r.ex[commitIdx], r.ey[commitIdx], 4, surf, COLORS[mk]);
+    list.forEach(function (c) {
+      var ff = Math.min(f, c.t.length - 1);
+      var commitIdx = Math.round(c.meta.h * CFG.viewHz);
+      polyline(c.ex, c.ey, ff, colorOf(c), 3);
+      if (ff >= commitIdx && commitIdx < c.ex.length) {
+        dot(c.ex[commitIdx], c.ey[commitIdx], 4, surf, colorOf(c));
       }
-      dot(r.ex[ff], r.ey[ff], 7, COLORS[mk], surf);
+      dot(c.ex[ff], c.ey[ff], 7, colorOf(c), surf);
     });
 
-    // Pursuers last, on top, each with its capture ring.
-    methods.forEach(function (mk) {
-      var r = D.runs[runKey(mk)];
-      var pf = Math.min(f, r.t.length - 1);
-      circle(r.px[pf], r.py[pf], CFG.captureRadius, crit, 2, [4, 4]);
-      if (state.compare) {
-        dot(r.px[pf], r.py[pf], 5, inkC);
+    list.forEach(function (c) {
+      var pf = Math.min(f, c.t.length - 1);
+      circle(c.px[pf], c.py[pf], CFG.captureRadius, crit, 2, [4, 4]);
+      if (list.length > 1) {
+        dot(c.px[pf], c.py[pf], 5, inkC);
       } else {
-        var pdx = pf > 0 ? r.px[pf] - r.px[pf - 1] : 1;
-        var pdy = pf > 0 ? r.py[pf] - r.py[pf - 1] : 0;
-        chevron(r.px[pf], r.py[pf], pdx, pdy, 11, inkC);
+        var pdx = pf > 0 ? c.px[pf] - c.px[pf - 1] : 1;
+        var pdy = pf > 0 ? c.py[pf] - c.py[pf - 1] : 0;
+        chevron(c.px[pf], c.py[pf], pdx, pdy, 11, inkC);
       }
     });
 
-    var lead = D.runs[runKey(methods[0])];
+    var lead = list[0];
     var lf = Math.min(f, lead.t.length - 1);
-    label(lead.px[lf], lead.py[lf], state.compare ? "PURSUERS" : "PURSUER",
+    label(lead.px[lf], lead.py[lf], list.length > 1 ? "PURSUERS" : "PURSUER",
           ink2, 16, -16);
-    if (!state.compare) {
-      var r0 = D.runs[runKey(state.method)];
-      var rf = Math.min(f, r0.t.length - 1);
-      label(r0.ex[rf], r0.ey[rf], "EVADER", COLORS[state.method], 14, -16);
+    if (list.length === 1) {
+      label(lead.ex[lf], lead.ey[lf], "EVADER", colorOf(lead), 14, -16);
     }
 
     var cur = current();
@@ -873,16 +1010,13 @@
     var M = { l: 44, r: 76, t: 12, b: 24 };
     var pw = W - M.l - M.r, ph = H - M.t - M.b;
 
-    var ink3 = css("--ink-3"), ink2 = css("--ink-2"), surf = css("--surface");
-
-    var tMax = CFG.viewHz > 0 ? spec.t[spec.t.length - 1] : 1;
+    var tMax = spec.t[spec.t.length - 1] || 1;
     var lo = spec.lo, hi = spec.hi;
     if (hi - lo < 1e-6) { hi = lo + 1; }
 
     function X(t) { return M.l + (t / tMax) * pw; }
     function Y(v) { return M.t + ph - ((v - lo) / (hi - lo)) * ph; }
 
-    // Grid and value axis.
     niceTicks(lo, hi, 4).forEach(function (v) {
       svg.appendChild(el("line", {
         class: "grid-line", x1: M.l, x2: M.l + pw, y1: Y(v), y2: Y(v)
@@ -892,7 +1026,6 @@
       svg.appendChild(tx);
     });
 
-    // Time axis.
     niceTicks(0, tMax, 6).forEach(function (t) {
       var tx = el("text", { class: "tick", x: X(t), y: H - 7, "text-anchor": "middle" });
       tx.textContent = t;
@@ -906,22 +1039,21 @@
     an.textContent = spec.unit;
     svg.appendChild(an);
 
-    // Zero reference, where crossing it means something.
     if (spec.zero != null && lo < spec.zero && hi > spec.zero) {
       svg.appendChild(el("line", {
         class: "zero-line", x1: M.l, x2: M.l + pw, y1: Y(spec.zero), y2: Y(spec.zero)
       }));
     }
 
-    // Commit instant.
+    // Commit instant. Every shown case shares the same h in a compare set.
+    var hCommit = spec.h;
     svg.appendChild(el("line", {
-      class: "commit-line", x1: X(CFG.h), x2: X(CFG.h), y1: M.t, y2: M.t + ph
+      class: "commit-line", x1: X(hCommit), x2: X(hCommit), y1: M.t, y2: M.t + ph
     }));
-    var ct = el("text", { class: "commit-tag", x: X(CFG.h) + 4, y: M.t + 9 });
+    var ct = el("text", { class: "commit-tag", x: X(hCommit) + 4, y: M.t + 9 });
     ct.textContent = "COMMIT";
     svg.appendChild(ct);
 
-    // Series.
     var labels = [];
     spec.series.forEach(function (s) {
       var d = "";
@@ -932,8 +1064,6 @@
         class: "series" + (s.dash ? " series-dash" : ""), d: d, stroke: s.color
       }));
       if (s.label) {
-        // Anchor the label where the line actually ends &mdash; a captured run stops
-        // early, and a label parked at the right edge would misreport that.
         var li = s.v.length - 1;
         labels.push({
           text: s.label, color: s.color,
@@ -943,13 +1073,13 @@
       }
     });
 
-    // Push overlapping labels apart. Converging trajectories would otherwise
-    // stack every label at the same height, into an unreadable pile.
+    // Push overlapping labels apart; converging traces would otherwise stack
+    // every label at the same height.
     var GAP = 11;
     labels.sort(function (a, b) { return a.y - b.y; });
-    for (var li2 = 1; li2 < labels.length; li2++) {
-      if (labels[li2].y - labels[li2 - 1].y < GAP) {
-        labels[li2].y = labels[li2 - 1].y + GAP;
+    for (var i2 = 1; i2 < labels.length; i2++) {
+      if (labels[i2].y - labels[i2 - 1].y < GAP) {
+        labels[i2].y = labels[i2 - 1].y + GAP;
       }
     }
     if (labels.length) {
@@ -958,20 +1088,15 @@
     }
     labels.forEach(function (l) {
       var lt = el("text", {
-        class: "direct-label",
-        x: l.x,
-        y: Math.max(M.t + 8, l.y),
-        fill: l.color
+        class: "direct-label", x: l.x, y: Math.max(M.t + 8, l.y), fill: l.color
       });
       lt.textContent = l.text;
       svg.appendChild(lt);
     });
 
-    // Cursor + current-value dots.
     var f = Math.min(state.frame, spec.t.length - 1);
     svg.appendChild(el("line", {
-      class: "cursor-line", x1: X(spec.t[f]), x2: X(spec.t[f]),
-      y1: M.t, y2: M.t + ph
+      class: "cursor-line", x1: X(spec.t[f]), x2: X(spec.t[f]), y1: M.t, y2: M.t + ph
     }));
     spec.series.forEach(function (s) {
       var i = Math.min(f, s.v.length - 1);
@@ -980,20 +1105,15 @@
       }));
     });
 
-    // Hover: move the global cursor, so all three charts and the map agree.
-    // Ignored while playing, so an idle mouse over a chart cannot fight the
-    // transport.
     svg.style.cursor = "ew-resize";
     svg.onpointermove = function (ev) {
       if (state.playing) return;
       var box = svg.getBoundingClientRect();
       var px = (ev.clientX - box.left) / box.width * W;
-      var frac = (px - M.l) / pw;
-      var idx = Math.round(frac * (spec.t.length - 1));
+      var idx = Math.round(((px - M.l) / pw) * (spec.t.length - 1));
       if (idx >= 0 && idx < spec.t.length) { setFrame(idx, false); }
     };
 
-    // Legend &mdash; identity is never colour alone.
     var lg = document.getElementById(legendId);
     lg.textContent = "";
     spec.series.forEach(function (s) {
@@ -1022,78 +1142,59 @@
   function drawCharts() {
     var cur = current();
     var tAxis = timeAxis();
-    var methods = shownMethods();
+    var list = shown();
+    var h = cur.meta.h;
 
-    // Speed.
     var sSeries = [], sData = [];
-    if (state.compare) {
-      methods.forEach(function (mk) {
-        var r = D.runs[runKey(mk)];
-        sSeries.push({ v: r.spd, color: COLORS[mk], label: shortLabelOf(mk),
-                       legend: labelOf(mk) + " actual" });
-        sData.push(r.spd);
+    if (list.length > 1) {
+      list.forEach(function (c) {
+        sSeries.push({ v: c.spd, color: colorOf(c), label: shortOf(c),
+                       legend: (METHOD_LABELS[c.meta.method] || c.meta.method) + " actual" });
+        sData.push(c.spd);
       });
     } else {
-      sSeries.push({ v: cur.cmd, color: COLORS[state.method], dash: true,
-                     legend: "Commanded" });
-      sSeries.push({ v: cur.spd, color: COLORS[state.method],
-                     legend: "Actual" });
+      sSeries.push({ v: cur.cmd, color: colorOf(cur), dash: true, legend: "Commanded" });
+      sSeries.push({ v: cur.spd, color: colorOf(cur), legend: "Actual" });
       sData.push(cur.cmd, cur.spd);
     }
     var sx = extent(sData, 0.08);
     drawChart("chart-speed", "legend-speed", {
-      t: tAxis, lo: Math.min(0, sx[0]), hi: sx[1], unit: "m/s",
-      series: sSeries
+      t: tAxis, lo: Math.min(0, sx[0]), hi: sx[1], unit: "m/s", h: h, series: sSeries
     });
 
-    // Margin.
     var mSeries = [], mData = [];
-    methods.forEach(function (mk) {
-      var r = D.runs[runKey(mk)];
-      mSeries.push({ v: r.mar, color: COLORS[mk],
-                     label: state.compare ? shortLabelOf(mk) : null,
-                     legend: state.compare ? labelOf(mk) : "Margin" });
-      mData.push(r.mar);
+    list.forEach(function (c) {
+      mSeries.push({ v: c.mar, color: colorOf(c),
+                     label: list.length > 1 ? shortOf(c) : null,
+                     legend: list.length > 1 ? (METHOD_LABELS[c.meta.method] || c.meta.method)
+                                             : "Margin" });
+      mData.push(c.mar);
     });
     var mx = extent(mData, 0.1);
     drawChart("chart-margin", "legend-margin", {
-      t: tAxis, lo: Math.min(-1, mx[0]), hi: mx[1], unit: "m", zero: 0,
+      t: tAxis, lo: Math.min(-1, mx[0]), hi: mx[1], unit: "m", zero: 0, h: h,
       series: mSeries
     });
 
-    // Range.
     var rSeries = [], rData = [];
-    methods.forEach(function (mk) {
-      var r = D.runs[runKey(mk)];
-      rSeries.push({ v: r.dist, color: COLORS[mk],
-                     label: state.compare ? shortLabelOf(mk) : null,
-                     legend: state.compare ? labelOf(mk) : "Gap" });
-      rData.push(r.dist);
+    list.forEach(function (c) {
+      rSeries.push({ v: c.dist, color: colorOf(c),
+                     label: list.length > 1 ? shortOf(c) : null,
+                     legend: list.length > 1 ? (METHOD_LABELS[c.meta.method] || c.meta.method)
+                                             : "Gap" });
+      rData.push(c.dist);
     });
     var rx = extent(rData, 0.08);
     drawChart("chart-range", "legend-range", {
-      t: tAxis, lo: 0, hi: rx[1], unit: "m", zero: CFG.captureRadius,
+      t: tAxis, lo: 0, hi: rx[1], unit: "m", zero: CFG.captureRadius, h: h,
       series: rSeries
     });
 
     var f = Math.min(state.frame, cur.t.length - 1);
     document.getElementById("speed-rt").textContent =
       "cmd " + cur.cmd[f].toFixed(2) + "  actual " + cur.spd[f].toFixed(2) + " m/s";
-    document.getElementById("margin-rt").textContent =
-      cur.mar[f].toFixed(2) + " m";
-    document.getElementById("range-rt").textContent =
-      cur.dist[f].toFixed(1) + " m";
-  }
-
-  function shortLabelOf(key) {
-    return labelOf(key).split(" ")[0];
-  }
-
-  function labelOf(key) {
-    for (var i = 0; i < D.methods.length; i++) {
-      if (D.methods[i].key === key) return D.methods[i].label;
-    }
-    return key;
+    document.getElementById("margin-rt").textContent = cur.mar[f].toFixed(2) + " m";
+    document.getElementById("range-rt").textContent = cur.dist[f].toFixed(1) + " m";
   }
 
   /* ---------------- tiles + table ---------------- */
@@ -1117,11 +1218,19 @@
   }
 
   function drawTiles() {
-    var m = current().metrics;
+    var c = current();
+    var m = c.metrics;
     var host = document.getElementById("tiles");
     host.textContent = "";
     host.appendChild(tile("Outcome", m.captured ? "Captured" : "Escaped", "",
-      m.captured, m.captured ? "at t = " + m.tCapture + " s" : "over 12 s window"));
+      m.captured, m.captured ? "at t = " + m.tCapture + " s" : "over the window"));
+    if (!m.committed) {
+      // Caught before h: there was no handover, so the handover tiles would
+      // be showing defaults rather than measurements.
+      host.appendChild(tile("Handover", "Never", "", true,
+        "caught before the hold expired"));
+      return;
+    }
     host.appendChild(tile("Command jump", m.cmdVelJump.toFixed(2), "m/s", false,
       "at the commit instant"));
     host.appendChild(tile("Demanded accel jump", m.cmdAccelJump.toFixed(1), "m/s\u00b2",
@@ -1134,25 +1243,28 @@
     host.appendChild(tile("Certificate", m.falseCert ? "False"
       : (m.certAtCommit ? "Held" : "Refused"), "", m.falseCert,
       m.falseCert ? "certified, then caught" : "evaluated at commit"));
+    host.appendChild(tile("At commit", m.surveyingAtCommit ? "Surveying" : "Turned",
+      "", false, m.surveyingAtCommit ? "switched straight from survey"
+                                     : "already heading away"));
   }
 
   function drawTable() {
     var tb = document.querySelector("#tbl tbody");
     tb.textContent = "";
-    D.methods.forEach(function (mt) {
-      var m = D.runs[runKey(mt.key)].metrics;
+    siblings(current()).forEach(function (c) {
+      var m = c.metrics;
       var tr = document.createElement("tr");
       function cell(txt, mark) {
         var td = document.createElement("td");
         if (mark) {
           var i = document.createElement("span");
-          i.className = "mk"; i.style.background = COLORS[mt.key];
+          i.className = "mk"; i.style.background = colorOf(c);
           td.appendChild(i);
         }
         td.appendChild(document.createTextNode(txt));
         return td;
       }
-      tr.appendChild(cell(mt.label, true));
+      tr.appendChild(cell(METHOD_LABELS[c.meta.method] || c.meta.method, true));
       tr.appendChild(cell(m.cmdVelJump.toFixed(2)));
       tr.appendChild(cell(m.cmdAccelJump.toFixed(1)));
       tr.appendChild(cell(m.peakCmdSlew.toFixed(1)));
@@ -1180,10 +1292,7 @@
     setFrame(parseInt(scrub.value, 10), true);
   });
 
-  function stop() {
-    state.playing = false;
-    playBtn.textContent = "Play";
-  }
+  function stop() { state.playing = false; playBtn.textContent = "Play"; }
 
   playBtn.addEventListener("click", function () {
     if (state.playing) { stop(); return; }
@@ -1216,9 +1325,7 @@
   }
 
   document.addEventListener("keydown", function (e) {
-    // The scrubber already handles arrows natively; stepping again here would
-    // move two frames per press.
-    if (e.target === scrub) return;
+    if (e.target === scrub || e.target.tagName === "SELECT") return;
     if (e.key === "ArrowRight") { setFrame(state.frame + 1, true); e.preventDefault(); }
     else if (e.key === "ArrowLeft") { setFrame(state.frame - 1, true); e.preventDefault(); }
     else if (e.key === " " && e.target.tagName !== "BUTTON") {
@@ -1238,6 +1345,7 @@
 
   function refresh(resetTime) {
     renderControls();
+    renderSpec();
     fitView();
     scrub.max = nFrames() - 1;
     if (resetTime) { state.frame = 0; scrub.value = 0; stop(); }
@@ -1247,7 +1355,6 @@
     draw();
   }
 
-  syncThemeLabel();
   refresh(true);
 })();
 </script>
