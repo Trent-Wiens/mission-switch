@@ -25,7 +25,9 @@ import os
 import sys
 import webbrowser
 
+from pursuit_evader.presets import V_FLEE
 from pursuit_evader.viz import (
+    load_grid_cells,
     METHOD_LABELS, build_case, build_payload, write_payload,
 )
 
@@ -168,7 +170,7 @@ def main(argv) -> int:
                      help="comma-separated: method, policy, h, tau")
 
     out = ap.add_argument_group("output")
-    out.add_argument("--vflee", type=float, default=8.0)
+    out.add_argument("--vflee", type=float, default=V_FLEE)
     out.add_argument("--window", type=float, default=14.0)
     out.add_argument("--no-open", action="store_true")
     out.add_argument("--quiet", action="store_true",
@@ -201,6 +203,7 @@ def main(argv) -> int:
 
     payload = build_payload(
         cases,
+        grid_cells=load_grid_cells(IMAGES),
         title=f"Varying {what}",
         subtitle=(f"{len(cases)} runs. Fixed: " + ", ".join(fixed) +
                   ". Every varying dimension gets its own selector."),

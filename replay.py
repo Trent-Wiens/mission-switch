@@ -34,7 +34,9 @@ import os
 import sys
 import webbrowser
 
+from pursuit_evader.presets import V_FLEE
 from pursuit_evader.viz import (
+    load_grid_cells,
     METHOD_LABELS, bearing_label, build_case, build_payload, write_payload,
 )
 
@@ -230,7 +232,7 @@ def main(argv) -> int:
                    help="include all four start-up methods per case")
     o.add_argument("--no-open", action="store_true",
                    help="write the viewer bundle but do not open a browser")
-    o.add_argument("--vflee", type=float, default=8.0)
+    o.add_argument("--vflee", type=float, default=V_FLEE)
     o.add_argument("--window", type=float, default=14.0)
 
     args = ap.parse_args(argv)
@@ -263,6 +265,7 @@ def main(argv) -> int:
     if args.viewer:
         payload = build_payload(
             cases,
+        grid_cells=load_grid_cells(IMAGES),
             title="Switch replay",
             subtitle=(f"{len(cases)} case(s) replayed from the grid. "
                       "Scrub the handover; the plan view and all three charts "

@@ -394,6 +394,38 @@
     margin-right: 7px;
   }
 
+  .cell-panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .cell-panel .hd {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .cell-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 8px 12px;
+  }
+  .cell-grid div { display: flex; flex-direction: column; gap: 1px; }
+  .cell-grid .k {
+    font-family: var(--mono); font-size: 9.5px;
+    letter-spacing: 0.04em; color: var(--ink-3);
+  }
+  .cell-grid .v {
+    font-family: var(--mono); font-size: 14px;
+    font-variant-numeric: tabular-nums; color: var(--ink);
+  }
+  .cell-grid .v.bad { color: var(--critical); }
+
   .note-strip {
     font-family: var(--mono);
     font-size: 11px;
@@ -459,6 +491,7 @@
       </section>
 
       <div class="tiles" id="tiles"></div>
+      <div id="cellhost"></div>
     </div>
 
     <section class="charts">
@@ -1010,11 +1043,13 @@
     var M = { l: 44, r: 76, t: 12, b: 24 };
     var pw = W - M.l - M.r, ph = H - M.t - M.b;
 
-    var tMax = spec.t[spec.t.length - 1] || 1;
+    var tMin = spec.t[0];
+    var tMax = spec.t[spec.t.length - 1];
+    if (tMax - tMin < 1e-9) { tMax = tMin + 1; }
     var lo = spec.lo, hi = spec.hi;
     if (hi - lo < 1e-6) { hi = lo + 1; }
 
-    function X(t) { return M.l + (t / tMax) * pw; }
+    function X(t) { return M.l + ((t - tMin) / (tMax - tMin)) * pw; }
     function Y(v) { return M.t + ph - ((v - lo) / (hi - lo)) * ph; }
 
     niceTicks(lo, hi, 4).forEach(function (v) {
@@ -1026,7 +1061,7 @@
       svg.appendChild(tx);
     });
 
-    niceTicks(0, tMax, 6).forEach(function (t) {
+    niceTicks(tMin, tMax, 6).forEach(function (t) {
       var tx = el("text", { class: "tick", x: X(t), y: H - 7, "text-anchor": "middle" });
       tx.textContent = t;
       svg.appendChild(tx);
@@ -1045,6 +1080,16 @@
       }));
     }
 
+    // Detection. Only worth drawing when something precedes it.
+    if (tMin < -1e-9) {
+      svg.appendChild(el("line", {
+        class: "commit-line", x1: X(0), x2: X(0), y1: M.t, y2: M.t + ph
+      }));
+      var dt_ = el("text", { class: "commit-tag", x: X(0) + 4, y: M.t + 20 });
+      dt_.textContent = "DETECT";
+      svg.appendChild(dt_);
+    }
+
     // Commit instant. Every shown case shares the same h in a compare set.
     var hCommit = spec.h;
     svg.appendChild(el("line", {
@@ -1056,15 +1101,18 @@
 
     var labels = [];
     spec.series.forEach(function (s) {
-      var d = "";
+      var d = "", pen = false;
       for (var i = 0; i < s.v.length; i++) {
-        d += (i ? "L" : "M") + X(spec.t[i]).toFixed(2) + "," + Y(s.v[i]).toFixed(2);
+        if (s.v[i] == null) { pen = false; continue; }   // no value here
+        d += (pen ? "L" : "M") + X(spec.t[i]).toFixed(2) + "," + Y(s.v[i]).toFixed(2);
+        pen = true;
       }
       svg.appendChild(el("path", {
         class: "series" + (s.dash ? " series-dash" : ""), d: d, stroke: s.color
       }));
       if (s.label) {
         var li = s.v.length - 1;
+        while (li > 0 && s.v[li] == null) li--;
         labels.push({
           text: s.label, color: s.color,
           x: Math.min(M.l + pw + 6, X(spec.t[li]) + 6),
@@ -1100,6 +1148,7 @@
     }));
     spec.series.forEach(function (s) {
       var i = Math.min(f, s.v.length - 1);
+      if (s.v[i] == null) return;
       svg.appendChild(el("circle", {
         class: "dot-now", cx: X(spec.t[i]), cy: Y(s.v[i]), r: 4, fill: s.color
       }));
@@ -1131,6 +1180,7 @@
     var lo = Infinity, hi = -Infinity;
     arrays.forEach(function (a) {
       for (var i = 0; i < a.length; i++) {
+        if (a[i] == null) continue;
         if (a[i] < lo) lo = a[i];
         if (a[i] > hi) hi = a[i];
       }
@@ -1248,6 +1298,50 @@
                                      : "already heading away"));
   }
 
+  function drawCell() {
+    // The section 4 table row this run belongs to. Those cells are statistics
+    // over all 432 detection geometries, so they can never be properties of a
+    // single replay -- showing them alongside places the run in its
+    // population.
+    var host = document.getElementById("cellhost");
+    host.textContent = "";
+    var cells = D.gridCells || {};
+    var c = current();
+    var key = c.meta.policy + "|" + c.meta.h + "|" + c.meta.tau + "|" + c.meta.method;
+    var g = cells[key];
+    if (!g) return;        // off-grid case (stop_first, an unswept tau, ...)
+
+    var panel = document.createElement("div");
+    panel.className = "cell-panel";
+    var hd = document.createElement("div");
+    hd.className = "hd";
+    hd.textContent = "Section 4 row \u2014 this configuration over all "
+                   + g.cases + " detection geometries";
+    panel.appendChild(hd);
+
+    var grid = document.createElement("div");
+    grid.className = "cell-grid";
+    [["peak cmd \u0394a", g.maxAccelJump.toFixed(1) + " m/s\u00b2", false],
+     ["peak cmd \u0394v", g.maxVelJump.toFixed(2) + " m/s", false],
+     ["smallest margin", g.minMargin == null ? "\u2014"
+        : g.minMargin.toFixed(2) + " m", g.minMargin != null && g.minMargin < 0],
+     ["captures", String(g.captures), g.captures > 0],
+     ["false certs", String(g.falseCert), g.falseCert > 0],
+     ["required range", g.reqRange == null ? "\u2014"
+        : g.reqRange.toFixed(1) + " m", false]
+    ].forEach(function (row) {
+      var d = document.createElement("div");
+      var k = document.createElement("span"); k.className = "k"; k.textContent = row[0];
+      var v = document.createElement("span");
+      v.className = "v" + (row[2] ? " bad" : "");
+      v.textContent = row[1];
+      d.appendChild(k); d.appendChild(v);
+      grid.appendChild(d);
+    });
+    panel.appendChild(grid);
+    host.appendChild(panel);
+  }
+
   function drawTable() {
     var tb = document.querySelector("#tbl tbody");
     tb.textContent = "";
@@ -1351,6 +1445,7 @@
     if (resetTime) { state.frame = 0; scrub.value = 0; stop(); }
     state.frame = Math.min(state.frame, nFrames() - 1);
     drawTiles();
+    drawCell();
     drawTable();
     draw();
   }

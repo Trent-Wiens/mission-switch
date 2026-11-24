@@ -40,10 +40,34 @@ class TestSurveillance(unittest.TestCase):
         e = fly(self.ctrl, self._on_circle(), self.p, 60.0)
         self.assertAlmostEqual(e.speed, self.p.surveil_speed, delta=0.1)
 
-    def test_command_is_always_at_survey_speed(self):
-        e = self._on_circle()
-        cmd = self.ctrl.command(0.0, e, FAR_AWAY, self.p.dt)
+    def test_command_is_at_survey_speed_without_feedforward(self):
+        ctrl = SurveillanceController(self.p, feedforward=False)
+        cmd = ctrl.command(0.0, self._on_circle(), FAR_AWAY, self.p.dt)
         self.assertAlmostEqual(cmd.norm, self.p.surveil_speed, delta=1e-9)
+
+    def test_feedforward_leads_by_exactly_tau_times_the_centripetal_accel(self):
+        """Holding the circle needs a = v^2/R inward; through the speed loop
+        that means commanding v + tau*a. Without it the drone orbits wide."""
+        plain = SurveillanceController(self.p, feedforward=False)
+        ff = SurveillanceController(self.p, feedforward=True)
+        e = self._on_circle()
+        lead = (ff.command(0.0, e, FAR_AWAY, self.p.dt)
+                - plain.command(0.0, e, FAR_AWAY, self.p.dt))
+        expected = self.p.tau * self.p.surveil_speed ** 2 / self.p.surveil_radius
+        self.assertAlmostEqual(lead.norm, expected, delta=1e-9)
+        # ...and it points inward, toward the centre.
+        self.assertLess(lead.dot(e.pos.unit()), 0.0)
+
+    def test_feedforward_removes_the_radius_error(self):
+        for ff, limit in ((False, 0.05), (True, 0.005)):
+            with self.subTest(feedforward=ff):
+                ctrl = SurveillanceController(self.p, feedforward=ff)
+                e = fly(ctrl, self._on_circle(), self.p, 63.0)   # one full lap
+                err = abs(e.pos.norm - self.p.surveil_radius)
+                if ff:
+                    self.assertLess(err, limit)
+                else:
+                    self.assertGreater(err, limit)   # the error it was built to fix
 
     def test_converges_back_onto_the_circle_from_outside(self):
         pos = from_polar(45.0, 0.0)

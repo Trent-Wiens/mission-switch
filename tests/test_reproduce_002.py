@@ -23,8 +23,7 @@ from pursuit_evader.scenarios import FROM_BEHIND, H_VALUES, HEAD_ON
 from pursuit_evader.startup import warm
 from pursuit_evader.sweep import required_detection_range, verify_monotone
 
-#: Experiment 002's plant: no speed-loop lag, no speed cap.
-LEGACY = Params(lag=False, v_max=None, dt=0.005, t_eval=25.0)
+from pursuit_evader.presets import LEGACY
 
 #: Warm start is the closest match to "ideal instant switch" with this
 #: controller, since the old toy had no controller memory to initialise.

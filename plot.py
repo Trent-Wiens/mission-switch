@@ -18,6 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from pursuit_evader.params import Params
+from pursuit_evader.presets import V_FLEE
 from pursuit_evader.scenarios import HEAD_ON
 from pursuit_evader.sim import Scenario, run
 from pursuit_evader.startup import blend, cold, filtered_blend, warm
@@ -44,7 +45,6 @@ METHODS = [
 
 H = 1.0
 TAU = 0.3
-V_FLEE = 8.0
 DETECT = 25.0
 
 

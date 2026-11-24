@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from typing import Dict, Iterable, List, Optional
 
 from .params import Params
@@ -62,8 +63,10 @@ def case_label(meta: dict) -> str:
     )
 
 
-def r2(x: float) -> float:
-    return round(x, 2)
+def r2(x: float):
+    """Round for transport. NaN becomes None -- JSON has no NaN, and the
+    prologue genuinely has no margin, because nothing had been detected."""
+    return None if math.isnan(x) else round(x, 2)
 
 
 def build_case(
@@ -75,6 +78,7 @@ def build_case(
     detect_range: float,
     v_flee: Optional[float] = 8.0,
     window: float = 14.0,
+    lead_in: float = 0.0,
     dt: float = 0.005,
     note: str = "",
 ) -> dict:
@@ -87,6 +91,7 @@ def build_case(
         policy=policy,
         startup=FACTORIES[method](),
         v_flee=v_flee,
+        lead_in=lead_in,
         params=params,
     )
     result = run(scenario)
@@ -103,6 +108,7 @@ def build_case(
         "method": method,
         "bearing_deg": round(bearing_deg, 1),
         "detect_range": round(detect_range, 2),
+        "leadIn": lead_in,
         "vFlee": v_flee,
         "note": note,
     }
@@ -142,10 +148,73 @@ def build_case(
     }
 
 
-def build_payload(cases: List[dict], title: str = "", subtitle: str = "") -> dict:
+def cell_key(policy: str, h: float, tau: float, method: str) -> str:
+    """Key into the section 4 table. Formatted to match what the viewer builds
+    from `meta`, where JavaScript renders 1.0 as "1"."""
+    return f"{policy}|{h:g}|{tau:g}|{method}"
+
+
+def load_grid_cells(images_dir: str) -> Dict[str, dict]:
+    """Aggregate the grid into section 4 table rows, keyed by configuration.
+
+    One table cell is a statistic over all 432 detection geometries, so it can
+    never be a property of a single replayed case.  Carrying it alongside lets
+    the viewer show a run against the population it came from.
+
+    Returns an empty dict if the grid has not been run.
+    """
+    import csv
+
+    results = os.path.join(images_dir, "grid_results.csv")
+    if not os.path.exists(results):
+        return {}
+
+    req = {}
+    req_path = os.path.join(images_dir, "grid_required_range.csv")
+    if os.path.exists(req_path):
+        with open(req_path) as fh:
+            for r in csv.DictReader(fh):
+                v = r["required_range"]
+                req[cell_key(r["policy"], float(r["h"]), float(r["tau"]),
+                             r["method"])] = None if v == "" else float(v)
+
+    agg: Dict[str, dict] = {}
+    with open(results) as fh:
+        for r in csv.DictReader(fh):
+            key = cell_key(r["policy"], float(r["h"]), float(r["tau"]),
+                           r["method"])
+            a = agg.setdefault(key, {
+                "cases": 0, "committed": 0, "captures": 0, "falseCert": 0,
+                "maxAccelJump": 0.0, "maxVelJump": 0.0,
+                "minMargin": None, "reqRange": req.get(key),
+            })
+            a["cases"] += 1
+            a["captures"] += int(r["captured_after_commit"])
+            a["falseCert"] += int(r["false_certificate"])
+            if not int(r["committed"]):
+                continue            # no handover: its jolt fields are defaults
+            a["committed"] += 1
+            a["maxAccelJump"] = max(a["maxAccelJump"], float(r["cmd_accel_jump"]))
+            a["maxVelJump"] = max(a["maxVelJump"], float(r["cmd_vel_jump"]))
+            m = r["min_margin_after_commit"]
+            if m != "":
+                a["minMargin"] = (float(m) if a["minMargin"] is None
+                                  else min(a["minMargin"], float(m)))
+
+    for a in agg.values():
+        a["maxAccelJump"] = round(a["maxAccelJump"], 2)
+        a["maxVelJump"] = round(a["maxVelJump"], 3)
+        if a["minMargin"] is not None:
+            a["minMargin"] = round(a["minMargin"], 2)
+    return agg
+
+
+def build_payload(cases: List[dict], title: str = "", subtitle: str = "",
+                  grid_cells: Optional[Dict[str, dict]] = None) -> dict:
     return {
         "title": title,
         "subtitle": subtitle,
+        "gridCells": grid_cells or {},
         "config": {
             "viewHz": VIEW_HZ,
             "surveilRadius": 30.0,

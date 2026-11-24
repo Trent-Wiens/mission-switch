@@ -21,8 +21,13 @@ class TestSpeedLoop(unittest.TestCase):
         for tau in (0.1, 0.3, 0.5):
             with self.subTest(tau=tau):
                 p = Params(lag=True, tau=tau, dt=tau / 100.0)
-                # Small step so the acceleration cap never binds.
-                v_cmd = Vec2(0.5, 0.0)
+                # The step has to be small enough that the acceleration cap
+                # never binds, or this measures the cap instead of the lag.
+                # The demand is v_cmd/tau at t=0, so the binding constraint is
+                # the smallest tau: 0.5/0.1 = 5 m/s^2 would exceed a_max = 4.
+                v_cmd = Vec2(0.2, 0.0)
+                self.assertLess(v_cmd.norm / tau, p.a_max,
+                                "step too large; the cap would bind")
                 e = Evader(pos=ZERO, vel=ZERO, params=p)
                 settle(e, v_cmd, tau, p.dt)
                 fraction = e.vel.x / v_cmd.x

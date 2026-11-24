@@ -508,8 +508,10 @@ class TestLagSwitch(unittest.TestCase):
         prompt = run(Scenario(params=FAST.with_(lag=False), **common))
 
         def tracking_error(result):
-            window = [s for s in result.trace if 1.0 <= s.t <= 2.0]
-            return max((s.evader_vel - s.cmd).norm for s in window)
+            # Before commit only. After it the escape command is the saturating
+            # value, and the difference is ~1e4 m/s whatever the lag does.
+            hold = [s for s in result.trace if not s.committed]
+            return max((s.evader_vel - s.cmd).norm for s in hold)
 
         self.assertLess(tracking_error(prompt), tracking_error(lagged))
 
@@ -519,8 +521,8 @@ class TestLagSwitch(unittest.TestCase):
 
         def tracking_error(tau):
             r = run(Scenario(params=FAST.with_(tau=tau), **common))
-            window = [s for s in r.trace if 1.0 <= s.t <= 2.0]
-            return max((s.evader_vel - s.cmd).norm for s in window)
+            hold = [s for s in r.trace if not s.committed]
+            return max((s.evader_vel - s.cmd).norm for s in hold)
 
         self.assertLess(tracking_error(0.1), tracking_error(0.5))
 

@@ -12,11 +12,10 @@ python3 run_tests.py          # all 146 tests, ~30 s
 python3 run_tests.py -v       # verbose
 python3 run_tests.py sim      # one module (tests/test_sim.py)
 
-python3 report.py all         # regenerate every number
-python3 report.py repro       # experiment 002 comparison
-python3 report.py startup     # the four start-up methods
+python3 grid.py               # the full 46,656-case sweep (~13 min)
+python3 grid.py --tables      # re-print its tables, no re-running
+python3 report.py repro       # experiment 002 comparison (legacy plant)
 python3 report.py filter      # where the safety filter overrides the blend
-python3 report.py trace       # writes CSV to ../Images/ for the milestone plot
 ```
 
 ## Figures

@@ -32,6 +32,7 @@ import time
 from multiprocessing import Pool
 
 from pursuit_evader.params import Params
+from pursuit_evader.presets import DT, T_EVAL, V_FLEE
 from pursuit_evader.scenarios import H_VALUES, TAU_VALUES, bearings, ranges
 from pursuit_evader.sim import Scenario, run
 from pursuit_evader.startup import blend, cold, filtered_blend, warm
@@ -41,9 +42,6 @@ IMAGES = os.path.join(os.path.dirname(HERE), "Images")
 CSV_PATH = os.path.join(IMAGES, "grid_results.csv")
 REQ_PATH = os.path.join(IMAGES, "grid_required_range.csv")
 
-V_FLEE = 8.0
-T_EVAL = 25.0
-DT = 0.005
 
 POLICIES = ("prepare", "forecast_forward", "defer")
 METHOD_KEYS = ("cold", "warm", "blend", "filtered")

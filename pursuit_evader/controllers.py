@@ -39,6 +39,17 @@ class SurveillanceController(Controller):
     k_radial: float = 1.0           # 1/s, pull back onto the circle
     counter_clockwise: bool = True
 
+    #: Feed the centripetal requirement forward through the speed loop.
+    #:
+    #: Holding a circle needs a = v^2/R inward, continuously.  A purely
+    #: proportional velocity command never asks for it, so the drone settles
+    #: into a permanent tracking error of exactly tau*v^2/R -- 0.09 m/s at the
+    #: default parameters, which is what was measured before this existed.
+    #: Since the speed loop gives a = (v_cmd - v)/tau, asking for acceleration
+    #: `a` means commanding `v + tau*a`.  Any real autopilot flying a circle
+    #: does this; without it the drone orbits slightly wide and slightly slow.
+    feedforward: bool = True
+
     def command(self, t: float, evader: Evader, est: Estimate, dt: float) -> Vec2:
         p = self.params
         radial = evader.pos - self.center
@@ -56,7 +67,12 @@ class SurveillanceController(Controller):
         desired = tangent * p.surveil_speed + radial_hat * (
             self.k_radial * (p.surveil_radius - r)
         )
-        return desired.unit() * p.surveil_speed
+        cmd = desired.unit() * p.surveil_speed
+
+        if self.feedforward and p.lag:
+            centripetal = p.surveil_speed * p.surveil_speed / p.surveil_radius
+            cmd = cmd - radial_hat * (p.tau * centripetal)
+        return cmd
 
 
 @dataclass

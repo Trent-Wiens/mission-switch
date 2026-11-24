@@ -69,6 +69,18 @@ class Scenario:
     v_flee: Optional[float] = None
     tau_cmd: float = 0.2                # s, the escape controller's own memory
 
+    # Seconds of surveillance flown BEFORE detection, recorded at negative t.
+    #
+    # With lead_in = 0 the drone is hand-placed exactly on its circle with
+    # exactly tangential velocity -- an initial condition no real surveillance
+    # flight produces.  Flying it in instead means the state at detection is
+    # whatever the surveillance controller actually settles on, which is the
+    # only honest basis for a claim about switching *out of* surveillance.
+    #
+    # Detection stays at t = 0, and `detect_range` and `bearing` are still
+    # measured from the evader's real state there, so both remain controlled.
+    lead_in: float = 0.0
+
     def __post_init__(self) -> None:
         if self.policy not in WAIT_POLICIES:
             raise ValueError(f"unknown policy {self.policy!r}; expected one of {WAIT_POLICIES}")
@@ -192,18 +204,57 @@ def run(scenario: Scenario) -> Result:
     p = scenario.params
     dt = p.dt
 
-    # --- initial geometry, defined at the moment of detection ---------------
+    # --- surveillance before detection --------------------------------------
     center = ZERO
-    evader_pos = from_polar(p.surveil_radius, scenario.theta0)
-    heading = evader_pos.unit().perp()                   # counter-clockwise
-    evader_vel = heading * p.surveil_speed
-    pursuer_pos = evader_pos + from_polar(
+    surveil = SurveillanceController(p, center=center)
+
+    # Start back along the circle so the drone ARRIVES at theta0 at detection.
+    omega = p.surveil_speed / p.surveil_radius
+    start_angle = scenario.theta0 - omega * scenario.lead_in
+    evader_pos = from_polar(p.surveil_radius, start_angle)
+    evader = Evader(pos=evader_pos,
+                    vel=evader_pos.unit().perp() * p.surveil_speed, params=p)
+
+    lead_samples: List[Sample] = []
+    if scenario.lead_in > 0.0:
+        # The pursuer has not been detected yet, so the drone is simply
+        # surveying -- no policy, no estimate in use.
+        blind = Estimate(pos=Vec2(-1.0e6, 0.0), vel=ZERO, age=0.0)
+        for i in range(int(round(scenario.lead_in / dt))):
+            t = -scenario.lead_in + i * dt
+            v_cmd = surveil.command(t, evader, blind, dt)
+            lead_samples.append((t, evader.pos, evader.vel, evader.accel, v_cmd))
+            evader.step(v_cmd, dt)
+
+    # --- geometry at detection, measured from the drone's REAL state --------
+    heading = evader.vel.unit()
+    pursuer_pos = evader.pos + from_polar(
         scenario.detect_range, heading.angle + scenario.bearing
     )
-
-    evader = Evader(pos=evader_pos, vel=evader_vel, params=p)
     pursuer = Pursuer(pos=pursuer_pos, params=p)
-    pursuer.vel = (evader_pos - pursuer_pos).unit() * p.v_pursuer
+    pursuer.vel = (evader.pos - pursuer_pos).unit() * p.v_pursuer
+
+    # Reconstruct where the pursuer came from, by walking pure pursuit
+    # backwards: at each earlier step it was one step behind, heading at where
+    # the drone was then.  A straight-line back-projection would show it
+    # arriving from the wrong direction, because the drone was moving too.
+    #
+    # Display only.  The pursuer was undetected during the prologue and never
+    # influenced the drone, and the margin is undefined because there was
+    # nothing to compute it against.
+    prologue: List[Sample] = []
+    p_pos = pursuer_pos
+    for t, pos, vel, accel, v_cmd in reversed(lead_samples):
+        heading = (pos - p_pos).unit()
+        p_pos = p_pos - heading * (p.v_pursuer * dt)
+        prologue.append(Sample(
+            t=t, evader_pos=pos, evader_vel=vel, evader_accel=accel,
+            cmd=v_cmd, pursuer_pos=p_pos,
+            distance=(pos - p_pos).norm,
+            margin=float("nan"), true_margin=float("nan"),
+            cert_holds=False, committed=False,
+        ))
+    prologue.reverse()
 
     estimator = DelayedEstimator(
         true_age=scenario.true_age, assumed_age=scenario.assumed_age, dt=dt
@@ -213,14 +264,13 @@ def run(scenario: Scenario) -> Result:
     for k in range(estimator._depth - 1, -1, -1):
         estimator.update(pursuer.pos - pursuer.vel * (k * dt), pursuer.vel)
 
-    surveil = SurveillanceController(p, center=center)
     waiter = _wait_controller(scenario.policy, p)
     escape = EscapeController(p, v_flee=scenario.v_flee, tau_cmd=scenario.tau_cmd)
     startup = scenario.startup
 
-    result = Result(scenario=scenario, trace=[])
+    result = Result(scenario=scenario, trace=list(prologue))
     committed = False
-    last_cmd = evader_vel                 # outgoing controller's command
+    last_cmd = evader.vel                 # outgoing controller's command
     prev_cmd: Optional[Vec2] = None
     t_commit = scenario.h
     # True at t = 0: the drone is on its surveillance circle when detection

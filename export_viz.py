@@ -16,7 +16,10 @@ from __future__ import annotations
 import os
 import sys
 
-from pursuit_evader.viz import build_case, build_payload, write_payload
+from pursuit_evader.presets import V_FLEE
+from pursuit_evader.viz import (
+    build_case, build_payload, load_grid_cells, write_payload,
+)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 IMAGES = os.path.join(os.path.dirname(HERE), "Images")
@@ -28,8 +31,13 @@ RANGES = [18.0, 25.0, 40.0]
 H_VALUES = [0.5, 1.0, 2.0]
 TAU_VALUES = [0.1, 0.3, 0.5]
 METHODS = ["cold", "warm", "blend", "filtered"]
-V_FLEE = 8.0
 WINDOW = 14.0
+
+#: Seconds of surveillance flown before detection, recorded at negative time.
+#: A full lap is 63 s, so this is about an eighth of one -- enough to see the
+#: drone actually surveying, and to show the state at detection is the settled
+#: one rather than wherever it was placed.
+LEAD_IN = 8.0
 
 
 def main() -> int:
@@ -44,14 +52,17 @@ def main() -> int:
                                 policy=policy, h=h, tau=tau, method=method,
                                 bearing_deg=bearing, detect_range=rng,
                                 v_flee=V_FLEE, window=WINDOW,
+                                lead_in=LEAD_IN,
                             ))
 
     payload = build_payload(
         cases,
+        grid_cells=load_grid_cells(IMAGES),
         title="Starting the escape controller without a jolt",
-        subtitle=("Replay of the handover instant. The drone surveys until a "
-                  "pursuer is detected at t = 0, waits out the hold, then "
-                  "commits to an escape controller."),
+        subtitle=(f"{LEAD_IN:g} s of surveillance is flown before detection and "
+                  "shown at negative time, so the state at the handover is the "
+                  "one the controller settles on rather than a placed initial "
+                  "condition. Detection at t = 0, then the hold, then the switch."),
     )
 
     os.makedirs(VIEWER, exist_ok=True)
